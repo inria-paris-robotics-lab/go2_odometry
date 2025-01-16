@@ -11,11 +11,29 @@ find_package(rclpy REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(unitree_go REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(Eigen3 REQUIRED)
+
+add_executable(imu_preint_node src/go2_imu_preint.cpp)
+
+target_include_directories(imu_preint_node PUBLIC
+                            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/equivariant-preintegration/include>
+							$<INSTALL_INTERFACE:third_party/equivariant-preintegration/include>  
+)
+
+target_include_directories(imu_preint_node PUBLIC
+                            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/Lie-plusplus/include>
+							$<INSTALL_INTERFACE:third_party/Lie-plusplus/include> 
+)
+
+
+target_link_libraries(imu_preint_node Eigen3::Eigen rclcpp)
+ament_target_dependencies(imu_preint_node rclcpp sensor_msgs)
 
 add_executable(state_converter_node src/go2_state_converter_node.cpp)
 ament_target_dependencies(state_converter_node rclcpp unitree_go sensor_msgs)
 
 install(TARGETS
+  imu_preint_node
   state_converter_node
   DESTINATION lib/${PROJECT_NAME}
 )
