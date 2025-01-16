@@ -10,11 +10,23 @@ class ImuPreIntNode : public rclcpp::Node
     public:
         ImuPreIntNode():Node("imu_preint")
         {
-            // RCLCPP_DEBUG(ImuPreIntNode->get_logger(), "My log message %d", 4);
+            // timer_ = this->create_wall_timer(
+            // std::chrono::milliseconds(200),
+            // std::bind(&ImuPreIntNode::timerCallback, this));
+            // RCLCPP_DEBUG(this->get_logger(), "My log message %d", 4);
+            this->main_loop();
+
         }
 
     private:
     /*
+        void timerCallback()
+        {
+            // RCLCPP_INFO(this->get_logger(), "Hello from ROS2");
+        }
+        rclcpp::TimerBase::SharedPtr timer_;
+    */
+
         int main_loop()
         {
             using namespace preintegration;
@@ -36,6 +48,12 @@ class ImuPreIntNode : public rclcpp::Node
             std::vector<Eigen::Vector3d> accs = utils::randomAcc<double>(-10, 10, n);
             std::vector<Eigen::Vector3d> gyros = utils::randomGyro<double>(-1, 1, n);
 
+            // for (int i = 0; i < n; ++i) {
+            //         std::cout << accs[i] << "\t" << std::endl;
+            // }
+
+
+
             // Integrate IMU measurements
             for (int j = 0; j < n; ++j) {
                 pim.integrateMeasurement(accs[j], gyros[j], dt);
@@ -43,18 +61,20 @@ class ImuPreIntNode : public rclcpp::Node
 
             // Display preintegrated measurements
             std::cout << "Preintegration Matrix:\n"
-                    << pim.Upsilon().asMatrix() << std::endl;
+                    << pim.Upsilon().asMatrix() << "\n" << std::endl;
             std::cout << "Preintegrated Rotation:\n"
-                    << pim.deltaRij() << std::endl;
-            std::cout << "Preintegrated Velocity: " << pim.deltaVij().transpose() << std::endl;
-            std::cout << "Preintegrated Position: " << pim.deltaPij().transpose() << std::endl;
-            std::cout << "Preintegration Time: " << pim.deltaTij() << std::endl;
+                    << pim.deltaRij() << "\n" << std::endl;
+            std::cout << "Preintegrated Velocity: " << pim.deltaVij().transpose() << "\n" << std::endl;
+            std::cout << "Preintegrated Position: " << pim.deltaPij().transpose() << "\n" << std::endl;
+            std::cout << "Preintegration Time: " << pim.deltaTij() << "\n" << std::endl;
             std::cout << "Preintegration Covariance:\n" << pim.Cov() << "\n\n" << std::endl;
             
+
+            rclcpp::shutdown();
             return 0;
 
         }
-    */
+ 
 };
 
 
