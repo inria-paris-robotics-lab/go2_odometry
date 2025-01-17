@@ -1,32 +1,73 @@
+// imu preintegration 
 #include "core/preintegration.hpp"
 #include "utils/tools.hpp"
 
+//ros2
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/imu.hpp"
+#include "std_msgs/msg/float64.hpp"
 
+//
+// #include <vector>
+
+/*
+Pour tester avec sin :
+subscriber qui ajoute valeur à un vector a chaque fois qu'une donnée IMU est envoyée
+Timer avec freq plus petite qui préintègre et publie au callback
+*/
 
 class ImuPreIntNode : public rclcpp::Node
 {
     public:
-        ImuPreIntNode():Node("imu_preint")
+        ImuPreIntNode()
+        : Node("imu_preint")
         {
-            // timer_ = this->create_wall_timer(
-            // std::chrono::milliseconds(200),
-            // std::bind(&ImuPreIntNode::timerCallback, this));
-            // RCLCPP_DEBUG(this->get_logger(), "My log message %d", 4);
-            this->main_loop();
+            // RCLCPP_DEBUG(this->get_logger(), "My log message %d", 4); //* kept for ref
 
+            subscription_ = this->create_subscription<std_msgs::msg::Float64>("fake_imu_noise", 10, std::bind(&ImuPreIntNode::subscription_callback, this, std::placeholders::_1));
+            timer_ = this->create_wall_timer(std::chrono::milliseconds(10), std::bind(&FakeImuNode::preintegration_callback, this));
+            
+            // setting preintegration parameters
+            using namespace preintegration;
+
+            params->setGravity(Eigen::Vector3d::UnitZ() * -9.81);
+            params->setGyroNoiseSigma(1e-4);
+            params->setAccNoiseSigma(1e-3);
+            params->setGyroBiasNoiseSigma(1e-6);
+            params->setAccBiasNoiseSigma(1e-5);
         }
 
     private:
-    /*
-        void timerCallback()
-        {
-            // RCLCPP_INFO(this->get_logger(), "Hello from ROS2");
-        }
-        rclcpp::TimerBase::SharedPtr timer_;
-    */
 
+        void subscription_callback(std_msgs::msg::Float64::SharedPtr msg)
+        {  /* Called when imu data is published: stores the last 100 data point in a list for preintegration later */
+
+            Eigen::Vector3d data ; 
+            data << msg->data, 0, 0;
+            RCLCPP_INFO_STREAM(this->get_logger(), "vector" << data);
+            this->accs.push_back(data);
+
+        }
+
+        void preintegration_callback()
+        {
+            using namespace preintegration;
+
+            // Initialize the preintegration object
+            EquivariantPreintegration<double> pim(params);
+        
+            // Example IMU measurements
+            size_t size = this->accs.size();
+            double dt = 0.01; //TODO : change based on timestamps from data received
+            this->accs // datato preintegrate
+
+            for (int j = 0; j < size; ++j) 
+            {
+                pim.integrateMeasurement(accs[j], gyros[j], dt);
+            }
+        }
+
+/*
         int main_loop()
         {
             using namespace preintegration;
@@ -74,6 +115,12 @@ class ImuPreIntNode : public rclcpp::Node
             return 0;
 
         }
+*/
+
+        rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr subscription_;
+        std::vector<Eigen::Vector3d> accs;
+        std::shared_ptr<PreintegrationParams<double>> params = std::make_shared<PreintegrationParams<double>>(); // preintegration parmeter object
+
  
 };
 

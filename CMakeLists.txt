@@ -14,25 +14,27 @@ find_package(sensor_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
 
 add_executable(imu_preint_node src/go2_imu_preint.cpp)
+add_executable(fake_imu_node src/fake_imu_data.cpp)
+ament_target_dependencies(fake_imu_node rclcpp sensor_msgs std_msgs)
 
 target_include_directories(imu_preint_node PUBLIC
-                            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/equivariant-preintegration/include>
-							$<INSTALL_INTERFACE:third_party/equivariant-preintegration/include>  
+                          $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/equivariant-preintegration/include>
+							            $<INSTALL_INTERFACE:third_party/equivariant-preintegration/include>  
 )
 
 target_include_directories(imu_preint_node PUBLIC
                             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/Lie-plusplus/include>
-							$<INSTALL_INTERFACE:third_party/Lie-plusplus/include> 
+							              $<INSTALL_INTERFACE:third_party/Lie-plusplus/include> 
 )
 
-
 target_link_libraries(imu_preint_node Eigen3::Eigen rclcpp)
-ament_target_dependencies(imu_preint_node rclcpp sensor_msgs)
+ament_target_dependencies(imu_preint_node rclcpp sensor_msgs std_msgs)
 
 add_executable(state_converter_node src/go2_state_converter_node.cpp)
 ament_target_dependencies(state_converter_node rclcpp unitree_go sensor_msgs)
 
 install(TARGETS
+  fake_imu_node
   imu_preint_node
   state_converter_node
   DESTINATION lib/${PROJECT_NAME}
