@@ -11,30 +11,80 @@ find_package(rclpy REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(unitree_go REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
+find_package(orocos_kdl_vendor REQUIRED)
+find_package(tf2_ros REQUIRED)
 
+
+# message("bbo"${CMAKE_SOURCE_DIR})
+
+include_directories(/home/lmanson/Code/GO2/unitree_ros2/cyclonedds_ws/external-libs/invariant-ekf/include)
+link_directories(/home/lmanson/Code/GO2/unitree_ros2/cyclonedds_ws/external-libs/invariant-ekf/lib)
+
+
+# find_package(inekf REQUIRED)
+
+# include_directories(${inekf_INCLUDE_DIRS})
+# link_directories( ${inekf_LIBRARY_DIRS})
+
+# message("inekf_INCLUDE_DIR: " ${inekf_INCLUDE_DIRS})
+# message("inekf_LIBRARY_DIRS: " ${inekf_LIBRARY_DIRS})
+# message("inekf_LIBRARIES: " ${inekf_LIBRARIES})
+
+# Inekf node
+add_executable(inekf_node src/inekf.cpp)
+
+target_link_libraries(inekf_node
+                      /home/lmanson/Code/GO2/unitree_ros2/cyclonedds_ws/external-libs/invariant-ekf/lib/libinekf.so
+                      Eigen3::Eigen
+                      rclcpp
+                      )
+
+ament_target_dependencies(inekf_node
+                          rclcpp
+                          nav_msgs
+                          unitree_go
+                         )
+
+# Preintegration node
 add_executable(imu_preint_node src/go2_imu_preint.cpp)
-add_executable(fake_imu_node src/fake_imu_data.cpp)
-ament_target_dependencies(fake_imu_node rclcpp sensor_msgs std_msgs)
 
 target_include_directories(imu_preint_node PUBLIC
                           $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/equivariant-preintegration/include>
-							            $<INSTALL_INTERFACE:third_party/equivariant-preintegration/include>  
-)
+							            $<INSTALL_INTERFACE:third_party/equivariant-preintegration/include>
+                          )
 
 target_include_directories(imu_preint_node PUBLIC
-                            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/Lie-plusplus/include>
-							              $<INSTALL_INTERFACE:third_party/Lie-plusplus/include> 
-)
+                          $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/Lie-plusplus/include>
+                          $<INSTALL_INTERFACE:third_party/Lie-plusplus/include> 
+                          )
 
-target_link_libraries(imu_preint_node Eigen3::Eigen rclcpp)
-ament_target_dependencies(imu_preint_node rclcpp sensor_msgs std_msgs)
+target_link_libraries(imu_preint_node 
+                      Eigen3::Eigen
+                      rclcpp
+                      )
 
+ament_target_dependencies(imu_preint_node
+                          rclcpp 
+                          sensor_msgs 
+                          nav_msgs
+                          unitree_go
+                          orocos_kdl_vendor
+                          tf2_ros
+                          )
+
+# State converter node
 add_executable(state_converter_node src/go2_state_converter_node.cpp)
-ament_target_dependencies(state_converter_node rclcpp unitree_go sensor_msgs)
+ament_target_dependencies(state_converter_node
+                          rclcpp
+                          unitree_go
+                          sensor_msgs
+                          )
+
 
 install(TARGETS
-  fake_imu_node
+  inekf_node
   imu_preint_node
   state_converter_node
   DESTINATION lib/${PROJECT_NAME}
