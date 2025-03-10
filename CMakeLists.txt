@@ -16,21 +16,11 @@ find_package(Eigen3 REQUIRED)
 find_package(orocos_kdl_vendor REQUIRED)
 find_package(tf2_ros REQUIRED)
 
-
-# message("bbo"${CMAKE_SOURCE_DIR})
-
+#inekf library
 include_directories(/home/lmanson/Code/GO2/unitree_ros2/cyclonedds_ws/external-libs/invariant-ekf/include)
 link_directories(/home/lmanson/Code/GO2/unitree_ros2/cyclonedds_ws/external-libs/invariant-ekf/lib)
 
-
-# find_package(inekf REQUIRED)
-
-# include_directories(${inekf_INCLUDE_DIRS})
-# link_directories( ${inekf_LIBRARY_DIRS})
-
-# message("inekf_INCLUDE_DIR: " ${inekf_INCLUDE_DIRS})
-# message("inekf_LIBRARY_DIRS: " ${inekf_LIBRARY_DIRS})
-# message("inekf_LIBRARIES: " ${inekf_LIBRARIES})
+# include_directories(${CMAKE_CURRENT_LIST_DIR}/include)
 
 # Inekf node
 add_executable(inekf_node src/inekf.cpp)

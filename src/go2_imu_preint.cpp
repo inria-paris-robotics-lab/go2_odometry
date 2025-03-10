@@ -64,7 +64,7 @@ class ImuPreIntNode : public rclcpp::Node
             // Setting preintegration parameters 
             using namespace preintegration;
 
-            this->params->setGravity(Eigen::Vector3d::UnitZ() * 9.81);
+            this->params->setGravity(Eigen::Vector3d::UnitZ() * -9.81);
             this->dt_integration = 1.0/this->get_parameter("imu_freq").as_int(); // conversion to seconds
 
             // Noise parameters ================================================
@@ -125,7 +125,7 @@ class ImuPreIntNode : public rclcpp::Node
 			// Linear acceleration
 			Eigen::Vector3d data_acc ;
             Eigen::Vector3d bias;
-            bias <<  -0.139, 0.0291, -0.21; //-0.15,-0.13,-0.18; //0.14 , 0.07, -0.23;
+            bias <<  0,0,0;//-0.139, 0.0291, -0.21; //-0.15,-0.13,-0.18; //0.14 , 0.07, -0.23;
             Eigen::Vector3d bias_comp = (imu_orientation_.transpose()*bias);
             
 
@@ -135,12 +135,17 @@ class ImuPreIntNode : public rclcpp::Node
             this->accs_.push_back(data_acc);
 
             // Orientation (for gravity compensation)
-            Eigen::Quaterniond imu_quat(msg->imu_state.quaternion[0],
+            Eigen::Quaterniond imu_quat(msg->imu_state.quaternion[3],
+                                        msg->imu_state.quaternion[0],
                                         msg->imu_state.quaternion[1],
-                                        msg->imu_state.quaternion[2],
-                                        msg->imu_state.quaternion[3]);
+                                        msg->imu_state.quaternion[2]
+                                        );
             
             imu_orientation_ = imu_quat.toRotationMatrix();
+
+            RCLCPP_INFO_STREAM(this->get_logger(), "orientation IMU:\n"<< imu_orientation_);
+            RCLCPP_INFO_STREAM(this->get_logger(), "accel IMU vu par preint:\n"<< accs_[0]-(imu_orientation_.transpose()*params->getGravity()));
+            
 
             // ! Accel Value Printing ==========================================
             // RCLCPP_INFO_STREAM(this->get_logger(),"accel brute - avec compensation bias\n" <<
@@ -217,7 +222,7 @@ class ImuPreIntNode : public rclcpp::Node
             
             // tranfert values to ros msg
             geometry_msgs::msg::Quaternion preint_quat;
-            preint_quat.w = quat_from_rot.w();
+            preint_quat.w = quat_from_rot.w(); // TODO: replace by eigen?
             preint_quat.x = quat_from_rot.x();
             preint_quat.y = quat_from_rot.y();
             preint_quat.z = quat_from_rot.z();

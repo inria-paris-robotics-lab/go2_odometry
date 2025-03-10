@@ -11,10 +11,15 @@
 
   <depend>nav_msgs</depend>
   <depend>sensor_msgs</depend>
-    <depend>std_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>
   <depend>rclcpp</depend>
   <depend>unitree_go</depend>
   <depend>Eigen3</depend>
+  <depend>orocos_kdl_vendor</depend>
+  <depend>tf2_ros</depend>
+
+ 
 
 
   <exec_depend>pinocchio</exec_depend>

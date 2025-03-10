@@ -20,6 +20,7 @@
 #include "unitree_go/msg/low_state.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 
+
 #define DT_MIN 1e-6
 #define DT_MAX 1
 
@@ -33,12 +34,12 @@ class InekfNode : public rclcpp::Node
     InekfNode()
     : Node("inekf_node")
     {
-
+        
         // // ROS2 Init
         lowstate_subscription_ = this->create_subscription<unitree_go::msg::LowState>("lowstate", 10, std::bind(&InekfNode::lowstate_callback_, this, std::placeholders::_1));
 
-        // Initialize noise parameters
-        NoiseParams noise_params;
+        // // Initialize noise parameters
+        // NoiseParams noise_params;
         // noise_params.setGyroscopeNoise(0.01);
         // noise_params.setAccelerometerNoise(0.1);
         // noise_params.setGyroscopeBiasNoise(0.00001);
@@ -46,8 +47,32 @@ class InekfNode : public rclcpp::Node
         // noise_params.setContactNoise(0.01);
 
 
-        // // Initialize initial state
-        // RobotState state;
+        // Initialize initial state
+
+        Eigen::MatrixXd identity = Eigen::MatrixXd::Identity(5,5);
+        Eigen::MatrixXd theta = Eigen::MatrixXd::Zero(6,1);
+        Eigen::MatrixXd P = Eigen::MatrixXd::Identity(15,15);
+
+        Eigen::MatrixXd v(3,3);
+
+        v << 1, 2, 3, 4, 5, 6,7,8,9;
+        //  "v.head(3) =" << endl << v.head(3) << endl << endl;
+        // cout << "v.tail<3>() = " << endl << v.tail<3>() << endl << endl;
+        // RCLCPP_INFO_STREAM(this->get_logger(),v.segment(1,4));
+        // cout << "after 'v.segment(1,4) *= 2', v =" << endl << v << endl;
+        // RCLCPP_INFO_STREAM(this->get_logger(),identity);
+
+        // RCLCPP_INFO_STREAM(this->get_logger(),identity);
+        // RCLCPP_INFO_STREAM(this->get_logger(),theta);
+        // RCLCPP_INFO_STREAM(this->get_logger(),P);
+
+        //auto* state = new RobotState(); //allocation sur la pile (Stack) //! delete state
+         //! understand why this works and below does not -> see what is the diff?
+        // RobotState state(identity,theta,P); //? Allocation sur le tas (Heap)
+
+
+        // RCLCPP_INFO_STREAM(this->get_logger(),(*state).getX());
+        //* All zeroes for now
         // Eigen::Matrix3d R_init = Eigen::Matrix3d::Identity(); // initial orientation
         // Eigen::Vector3d v_init = Eigen::Vector3d::Zero();     // initial velocity
         // Eigen::Vector3d p_init = Eigen::Vector3d::Zero();     // initial position
@@ -64,12 +89,12 @@ class InekfNode : public rclcpp::Node
         // filter_.setState(state);
 
 
-        // // Initialize filter
+        // Initialize filter
 
-        // cout << "Noise parameters are initialized to: \n";
-        // cout << filter_.getNoiseParams() << endl;
-        // cout << "Robot's state is initialized to: \n";
-        // cout << filter_.getState() << endl;
+        // RCLCPP_INFO_STREAM(this->get_logger(),"Noise parameters are initialized to: \n"
+        // << filter_.getNoiseParams()
+        // << "Robot's state is initialized to: \n" 
+        // << filter_.getState());
 
     }
 
@@ -98,20 +123,10 @@ class InekfNode : public rclcpp::Node
             // //! f_contact = [fc_unitree[i] for i in [1, 0, 3, 2]] dans feet_to_odom: ordre a modifier pour matcher urdf
             for(int foot_id = 0; foot_id < 4 ; foot_id++ ) 
             {
-                
                 foot_contact = (msg->foot_force[foot_id] > 20) ? 1 : 0; // converting float foot contact to bool
-
-                // if(state_msg.foot_force[foot_id]>20)
-                // {
-                //     foot_contact = 1;
-                // }
-                // else
-                // {
-                //     foot_contact = 0;
-                // }
-
                 contacts.push_back(pair<int,bool> (foot_id, foot_contact)); 
             }
+
             RCLCPP_INFO_STREAM(this->get_logger(),"Foot contact " << contacts[0].first << contacts[0].second << " " << contacts[1].first << contacts[1].second << " " << contacts[2].first << contacts[2].second << " " << contacts[3].first << contacts[3].second);
             // this->filter_.setContacts(contacts);
      
@@ -120,11 +135,11 @@ class InekfNode : public rclcpp::Node
 
 
         // // Kalman variables
-        // InEKF filter_; // pointer to the filter so it can be initialized in the init
-        // Eigen::Matrix<double,6,1> imu_measurement_;
-        // Eigen::Matrix<double,6,1> imu_measurement_prev_;
-        // double t_ = 0;
-        // double t_prev_ = 0;
+        InEKF filter_; // pointer to the filter so it can be initialized in the init
+        Eigen::Matrix<double,6,1> imu_measurement_;
+        Eigen::Matrix<double,6,1> imu_measurement_prev_;
+        double t_ = 0;
+        double t_prev_ = 0;
 
         // // ROS 2
         rclcpp::Subscription<unitree_go::msg::LowState>::SharedPtr lowstate_subscription_;
@@ -143,4 +158,3 @@ int main(int argc, char * argv[])
   rclcpp::shutdown();
   return 0;
 }
-
