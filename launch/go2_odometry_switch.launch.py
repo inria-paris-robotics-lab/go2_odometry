@@ -10,7 +10,7 @@ def generate_launch_description():
     odom_type_arg = DeclareLaunchArgument(
         'odom_type',
         default_value='use_full_odom',
-        description='Type of odometry desired between : fake, mocap, preint_ekf'
+        description='Type of odometry desired between : fake, mocap, preint'
     )
 
     fake_odom_base_height_arg = DeclareLaunchArgument(
@@ -87,36 +87,8 @@ def generate_launch_description():
             condition=IfCondition(PythonExpression(["'",LaunchConfiguration('odom_type'),"' == 'fake'"]))
         ),
 
-<<<<<<< HEAD
         IncludeLaunchDescription
         (
-=======
-        Node(
-            package="go2_odometry",
-            executable="mocap_base_pose.py",
-            name='mocap_base_estimator',
-            condition=IfCondition(PythonExpression(["'",LaunchConfiguration('odom_type'),"' == 'mocap'"]))   
-        ),
-
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource([minimal_state_publisher_launch_file]),
-            condition=IfCondition(PythonExpression(["'",LaunchConfiguration('odom_type'),"' == 'mocap'"]))  
-        ),
-
-        Node(
-            package="go2_odometry",
-            executable="imu_preint_node",
-            name="imu_preint_node",
-            condition=IfCondition(PythonExpression(["'",LaunchConfiguration('odom_type'),"' == 'preint_ekf'"]))
-        ),
-
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource([full_state_publisher_launch_file]),
-            condition=IfCondition(PythonExpression(["'",LaunchConfiguration('odom_type'),"' == 'preint_ekf'"]))
-        ),
-
-        IncludeLaunchDescription(
->>>>>>> 4c772c1 (wip)
             PythonLaunchDescriptionSource([full_state_publisher_launch_file]),
             condition=IfCondition(PythonExpression(["'",LaunchConfiguration('odom_type'),"' == 'use_full_odom'"]))
         )
