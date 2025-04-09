@@ -11,12 +11,39 @@ find_package(rclpy REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(unitree_go REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(inekf REQUIRED)
+find_package(builtin_interfaces REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
+
+# Build msgs
+set(msg_files
+  "msg/OdometryVector.msg"
+)
+
+rosidl_generate_interfaces(${PROJECT_NAME}
+  ${msg_files}
+  DEPENDENCIES builtin_interfaces std_msgs sensor_msgs
+)
 
 add_executable(state_converter_node src/go2_state_converter_node.cpp)
 ament_target_dependencies(state_converter_node rclcpp unitree_go sensor_msgs)
 
+add_executable(inekf_odometry src/inekf_odometry.cpp)
+target_link_libraries(inekf_odometry inekf::inekf)
+ament_target_dependencies(inekf_odometry rclcpp sensor_msgs nav_msgs geometry_msgs tf2_ros)
+
+rosidl_target_interfaces(state_converter_node 
+  ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
+rosidl_target_interfaces(inekf_odometry 
+  ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
 install(TARGETS
   state_converter_node
+  inekf_odometry
   DESTINATION lib/${PROJECT_NAME}
 )
 

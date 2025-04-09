@@ -3,8 +3,10 @@
 import rclpy
 from rclpy.node import Node
 
-from nav_msgs.msg import Odometry
+from go2_odometry.msg import OdometryVector
 from unitree_go.msg import LowState
+from geometry_msgs.msg import PoseWithCovariance
+from scipy.spatial.transform import Rotation
 
 import numpy as np
 import pinocchio as pin
@@ -15,9 +17,8 @@ class FeetToOdom(Node):
     def __init__(self):
         super().__init__('feet_to_odom')
 
-        self.vel_publisher_ = self.create_publisher(Odometry, 'odometry/feet_vel', 10)
-        self.pos_publisher_ = self.create_publisher(Odometry, 'odometry/feet_pos', 10)
-        self.subscription_ = self.create_subscription(
+        self.pos_publisher = self.create_publisher(OdometryVector, 'odometry/feet_pos', 10)
+        self.subscription = self.create_subscription(
             LowState,
             '/lowstate',
             self.listener_callback,
@@ -27,20 +28,6 @@ class FeetToOdom(Node):
         self.foot_frame_name = [prefix + "_foot" for prefix in ["FL", "FR", "RL", "RR"]]
         self.foot_frame_id = [self.robot.model.getFrameId(frame_name) for frame_name in self.foot_frame_name]
         self.imu_frame_id = self.robot.model.getFrameId("imu")
-
-        self.prefilled_vel_msg = Odometry()
-        self.prefilled_vel_msg.pose.covariance = [0.]*36
-        self.prefilled_vel_msg.twist.covariance = [0.]*36
-
-        self.prefilled_vel_msg.twist.covariance[0 * (6+1)] = 1**2
-        self.prefilled_vel_msg.twist.covariance[1 * (6+1)] = 1**2
-        self.prefilled_vel_msg.twist.covariance[2 * (6+1)] = 1**2
-
-        self.prefilled_pos_msg = Odometry()
-        self.prefilled_pos_msg.header.frame_id = "base"
-        self.prefilled_pos_msg.pose.covariance = [0.]*36
-        self.prefilled_pos_msg.twist.covariance = [0.]*36
-        self.prefilled_pos_msg.pose.covariance[2 * (6+1)] = 1**2
 
     def _unitree_to_urdf_vec(self, vec):
         return  [vec[3],  vec[4],  vec[5],
@@ -65,27 +52,41 @@ class FeetToOdom(Node):
         self.robot.forwardKinematics(q, v)
         pin.updateFramePlacements(self.robot.model, self.robot.data)
         bMf_list = [self.robot.data.oMf[id] for id in self.foot_frame_id]
-        Vf_list = [pin.getFrameVelocity(self.robot.model, self.robot.data, id, pin.LOCAL) for id in self.foot_frame_id]
 
         # Make message
-        odom_msg = self.prefilled_vel_msg
-        pos_msg = self.prefilled_pos_msg
-        pos_msg.header.stamp = odom_msg.header.stamp = self.get_clock().now().to_msg()
+        pos_msg = OdometryVector()
+        pos_msg.header.stamp = self.get_clock().now().to_msg()
+        pos_list = []
+        feet_list = []
         for i in range(4):
-            if(f_contact[i]<20):
+            if(f_contact[i]<10):
                 continue # Feet in the air : skip
-            vb = -Vf_list[i]
-            bMf = bMf_list[i]
 
-            odom_msg.header.frame_id = self.foot_frame_name[i]
-            odom_msg.child_frame_id = self.foot_frame_name[i]
-            odom_msg.twist.twist.linear.x, odom_msg.twist.twist.linear.y, odom_msg.twist.twist.linear.z = vb.linear
-            self.vel_publisher_.publish(odom_msg)
+            feet_list.append(self.foot_frame_name[i])
+            pose_foot = PoseWithCovariance()
+            pose_foot.covariance = [0.] * 36
 
-            pos_msg.header.frame_id = "odom"
-            pos_msg.child_frame_id = "base"
-            pos_msg.pose.pose.position.z = -bMf.translation[2]
-            self.pos_publisher_.publish(pos_msg)
+            pose_foot.pose.position.x = bMf_list[i].translation[0]
+            pose_foot.pose.position.y = bMf_list[i].translation[1]
+            pose_foot.pose.position.z = bMf_list[i].translation[2]
+
+            foot_rotation = bMf_list[i].rotation
+            r = Rotation.from_matrix([[foot_rotation[0][0], foot_rotation[0][1], foot_rotation[0][2]],
+                                  [foot_rotation[1][0], foot_rotation[1][1], foot_rotation[1][2]],
+                                  [foot_rotation[2][0], foot_rotation[2][1], foot_rotation[2][2]]])
+            
+            qx, qy, qz, qw = r.as_quat()
+            pose_foot.pose.orientation.x = qx
+            pose_foot.pose.orientation.y = qy
+            pose_foot.pose.orientation.z = qz
+            pose_foot.pose.orientation.w = qw
+
+            pos_list.append(pose_foot)
+
+        pos_msg.feet_names = feet_list
+        pos_msg.pose_vec = pos_list
+
+        self.pos_publisher.publish(pos_msg)
 
 def main(args=None):
     rclpy.init(args=args)
