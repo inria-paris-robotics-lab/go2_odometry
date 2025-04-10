@@ -4,6 +4,7 @@ from launch_ros.actions import Node
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import PathJoinSubstitution, LaunchConfiguration, TextSubstitution
 from launch_ros.substitutions import FindPackageShare
+from launch.conditions import  IfCondition
 
 def generate_launch_description():
 
@@ -13,6 +14,12 @@ def generate_launch_description():
                                     'go2_state_publisher.launch.py'
                                   ])
     
+    mimic_go2_odometry_arg = DeclareLaunchArgument(
+                    'mimic_go2_odometry',
+                    default_value=TextSubstitution(text='1'),
+                    description='Types of use of the motion capture: 0 (as a ground truth), 1 (as a perfect pose estimator) \n\t\tIf 0 is selected will publish on /tf odom -> base_mocap \n\t\tIf 1 is selected will publish on /tf odom -> base as well as /odometry/filtered'
+    )
+
     mocap_base_frame_arg = DeclareLaunchArgument(
                             'base_frame',
                             default_value='base',
@@ -45,6 +52,7 @@ def generate_launch_description():
         mocap_object_name_arg,
         mocap_ip_arg,
         mocap_publishing_freq_arg,
+        mimic_go2_odometry_arg,
 
         Node(
             package="go2_odometry",
@@ -55,12 +63,17 @@ def generate_launch_description():
             "odom_frame": LaunchConfiguration('odom_frame'),
             "wanted_body": LaunchConfiguration('wanted_body'),
             "qualisys_ip": LaunchConfiguration('qualisys_ip'),
-            "publishing_freq": LaunchConfiguration('publishing_freq')
+            "publishing_freq": LaunchConfiguration('publishing_freq'),
+            "mimic_go2_odometry": LaunchConfiguration('mimic_go2_odometry')
         }]
-        ),
-
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource([minimal_state_publisher_launch_file])
         )
+        ,
+        
+        IncludeLaunchDescription
+        (
+            PythonLaunchDescriptionSource([minimal_state_publisher_launch_file]),
+            condition=IfCondition(LaunchConfiguration('mimic_go2_odometry'))
+        )
+
 
 ])

@@ -19,13 +19,20 @@ from nav_msgs.msg import Odometry
 
 class MocapOdometryNode(Node):
     def __init__(self):
-        super().__init__('feet_to_odom') 
+        super().__init__('mocap_base_estimator') 
 
-        self.declare_parameter("base_frame", "base")
+        # ros2 parameters ======================================================
         self.declare_parameter("odom_frame", "odom")
         self.declare_parameter("wanted_body","Go2") # go2, cube or None
         self.declare_parameter("qualisys_ip","192.168.75.2")
         self.declare_parameter("publishing_freq",110)     # in Hz : due to the discretisation the frequency may be slightly lower than what is it set to. Max limit of 300Hz (set in MoCap software)
+        self.declare_parameter("mimic_go2_odometry",0)
+        self.mocap_as_pose_estimate = bool(self.get_parameter("mimic_go2_odometry").value)
+        # change name of base_frame according to use case
+        if  self.mocap_as_pose_estimate :
+            self.declare_parameter("base_frame","base")
+        else:
+            self.declare_parameter("base_frame","base_frame")
 
         # Check if publishing freq is a correct value
         if isinstance(self.get_parameter("publishing_freq").value, int) is False or self.get_parameter("publishing_freq").value > 300 or self.get_parameter("publishing_freq").value < 0:
@@ -34,22 +41,23 @@ class MocapOdometryNode(Node):
             self.destroy_node()
             return
         
-        
-        
+        # publishers ===========================================================
+        self.tf_broadcaster = TransformBroadcaster(self)
 
+        if self.mocap_as_pose_estimate : # publish odometry if mocap is used as a perfect pose estimator
+            self.odometry_publisher = self.create_publisher(Odometry, 'odometry/filtered', 10)
 
+        # startup info =========================================================
         self.get_logger().info("MoCap started with parameters:")
         self.get_logger().info("base_frame: "+self.get_parameter("base_frame").value)
         self.get_logger().info("odom_frame: "+self.get_parameter("odom_frame").value)
         self.get_logger().info("qualisys_ip: "+self.get_parameter("qualisys_ip").value)
         self.get_logger().info("wanted_body: "+self.get_parameter("wanted_body").value)
         self.get_logger().info("publishing_freq: " + str(self.get_parameter("publishing_freq").value))
+        self.get_logger().info("mimic_go2_odometry: " + str(self.mocap_as_pose_estimate ))
 
 
-        self.tf_broadcaster = TransformBroadcaster(self)
-        self.odometry_publisher = self.create_publisher(Odometry, 'odometry/filtered', 10)
-
-        # Connecting to the motion capture
+        # Connecting to the motion capture =====================================
         asyncio.ensure_future(self.setup())
         self.loop = asyncio.get_event_loop()
         self.loop.run_forever()
@@ -102,7 +110,12 @@ class MocapOdometryNode(Node):
                 
                     # Transform from odom_frame (unmoving) to base_frame (tied to robot base)
                     self.transform_msg.header.stamp = timestamp
-                    self.transform_msg.child_frame_id = self.get_parameter("base_frame").value
+                    
+                    if not self.mocap_as_pose_estimate: # change the name of the transformation published so that it doesn't interfer with robot control when used as ground truth
+                        self.transform_msg.child_frame_id = 'base_mocap' 
+                    else:
+                        self.transform_msg.child_frame_id = self.get_parameter("base_frame").value
+
                     self.transform_msg.header.frame_id = self.get_parameter("odom_frame").value
 
                     # translation + convert from millimeter to meter 
@@ -116,34 +129,36 @@ class MocapOdometryNode(Node):
                     self.transform_msg.transform.rotation.z = qz
                     self.transform_msg.transform.rotation.w = qw
 
-
-                    self.odometry_msg.header.stamp = timestamp
-                    self.odometry_msg.child_frame_id = self.get_parameter("base_frame").value
-                    self.odometry_msg.header.frame_id = self.get_parameter("odom_frame").value
-
-                    # position + convert to meter
-                    self.odometry_msg.pose.pose.position.x = position[0]*0.001
-                    self.odometry_msg.pose.pose.position.y = position[1]*0.001
-                    self.odometry_msg.pose.pose.position.z = position[2]*0.001 
-
-                    #orientation
-                    self.odometry_msg.pose.pose.orientation.x = qx
-                    self.odometry_msg.pose.pose.orientation.y = qy
-                    self.odometry_msg.pose.pose.orientation.z = qz
-                    self.odometry_msg.pose.pose.orientation.w = qw 
-
-                    # linear speed
-                    self.odometry_msg.twist.twist.linear.x = 0. 
-                    self.odometry_msg.twist.twist.linear.y = 0.
-                    self.odometry_msg.twist.twist.linear.z = 0.
-
-                    # angular speed
-                    self.odometry_msg.twist.twist.angular.x = 0.
-                    self.odometry_msg.twist.twist.angular.y = 0.
-                    self.odometry_msg.twist.twist.angular.z = 0.
                     self.tf_broadcaster.sendTransform(self.transform_msg)
-                    self.odometry_publisher.publish(self.odometry_msg)
 
+
+                    if self.mocap_as_pose_estimate : # publish odometry if mocap is used as a perfect pose estimator
+                        self.odometry_msg.header.stamp = timestamp
+                        self.odometry_msg.child_frame_id = self.get_parameter("base_frame").value
+                        self.odometry_msg.header.frame_id = self.get_parameter("odom_frame").value
+
+                        # position + convert to meter
+                        self.odometry_msg.pose.pose.position.x = position[0]*0.001
+                        self.odometry_msg.pose.pose.position.y = position[1]*0.001
+                        self.odometry_msg.pose.pose.position.z = position[2]*0.001 
+
+                        #orientation
+                        self.odometry_msg.pose.pose.orientation.x = qx
+                        self.odometry_msg.pose.pose.orientation.y = qy
+                        self.odometry_msg.pose.pose.orientation.z = qz
+                        self.odometry_msg.pose.pose.orientation.w = qw 
+
+                        # linear speed
+                        self.odometry_msg.twist.twist.linear.x = 0. 
+                        self.odometry_msg.twist.twist.linear.y = 0.
+                        self.odometry_msg.twist.twist.linear.z = 0.
+
+                        # angular speed
+                        self.odometry_msg.twist.twist.angular.x = 0.
+                        self.odometry_msg.twist.twist.angular.y = 0.
+                        self.odometry_msg.twist.twist.angular.z = 0.
+                        self.odometry_publisher.publish(self.odometry_msg)
+                   
                 else:
                     pass # ignore other bodies
 
