@@ -11,6 +11,7 @@ from nav_msgs.msg import Odometry
 from go2_odometry.msg import OdometryVector
 import pinocchio as pin
 
+import copy
 from sensor_msgs.msg import Imu
 from tf2_ros import TransformBroadcaster
 from geometry_msgs.msg import TransformStamped
@@ -58,8 +59,8 @@ class Inekf(Node):
 
 
         # Data from go2 ========================================================
-        self.imu_measurement = np.zeros((6,1))
-        self.imu_measurement_prev = np.zeros((6,1))
+        self.imu_measurement = np.zeros(6)
+        self.imu_measurement_prev = np.zeros(6)
         self.quaternion_measurement = np.zeros((4))
         self.quaternion = np.zeros((4,1))
         self.feet_contacts = np.zeros((4))
@@ -113,15 +114,22 @@ class Inekf(Node):
         self.t = state_msg.header.stamp.sec + state_msg.header.stamp.nanosec * 1e-9 
 
         pose_vec = state_msg.pose_vec
+        vel_vec = state_msg.vel_vec
         contact_states = state_msg.contact_states
         #self.get_logger().info('Feet in contact ' + str(state_msg.feet_names))
         
         contact_list = []
         kinematics_list = []
 
+        current_base_rotation = self.filter.getState().getRotation()
+
         for i in range(len(self.foot_frame_name)):
             contact_list.append((i, contact_states[i]))
             pose = pose_vec[i]
+
+            full_cov = pose.covariance[:9]
+            full_cov = np.squeeze(full_cov)
+            full_cov = full_cov.reshape(3,3)
             
             quat = pin.Quaternion(pose.pose.orientation.w,
                                   pose.pose.orientation.x, 
@@ -134,13 +142,21 @@ class Inekf(Node):
             translation[1] = pose.pose.position.y
             translation[2] = pose.pose.position.z
 
-            velocity = np.zeros(3)
+            vel_foot = np.zeros(3)
+            vel_foot[0] = vel_vec[i].x
+            vel_foot[1] = vel_vec[i].y
+            vel_foot[2] = vel_vec[i].z
+
+            vel_foot_in_local = vel_foot + np.cross(self.imu_measurement[:3], translation)
+            vel_foot_in_local = current_base_rotation @ vel_foot_in_local
+
+            velocity = -vel_foot_in_local
 
             kinematics = Kinematics()
             kinematics.id = i
             kinematics.position = translation
-            kinematics.velocity = velocity
-            kinematics.covariance = np.eye(3) * 0.001 #pose.covariance
+            kinematics.velocity = np.zeros(3)
+            kinematics.covariance = full_cov
             kinematics.covariance_vel = np.eye(3) * 0.001 #pose.covariance
 
             kinematics_list.append(kinematics)
@@ -151,12 +167,13 @@ class Inekf(Node):
         #self.get_logger().info('Contact list' + str(contact_list))
         self.filter.setContacts(contact_list)
         self.filter.correctKinematics(kinematics_list)
-        #new_state = self.filter.getState()
-        #new_X = new_state.getX()
-        #for i in range(len(kinematics_list)):
-        #    new_X[2, 5 + i] = 0.023 
-        #new_state.setX(new_X)
-        #self.filter.setState(new_state)
+        """ new_state = self.filter.getState()
+        new_X = copy.deepcopy(new_state.getX())
+        dimX = new_state.dimX()
+        for i in range(5, dimX):
+            new_X[2, i] = 0.023 
+        new_state.setX(new_X)
+        self.filter.setState(new_state) """
         #self.get_logger().info('Correct kinematics ' + str(new_pose))
         """ if len(kinematics_list) > 0:
             exit() """
@@ -173,13 +190,13 @@ class Inekf(Node):
     
         # IMU measurement - used for propagation ===============================
         #! gyroscope meas in filter are radians
-        self.imu_measurement[0][0] = state_msg.angular_velocity.x
-        self.imu_measurement[1][0] = state_msg.angular_velocity.y
-        self.imu_measurement[2][0] = state_msg.angular_velocity.z
+        self.imu_measurement[0] = state_msg.angular_velocity.x
+        self.imu_measurement[1] = state_msg.angular_velocity.y
+        self.imu_measurement[2] = state_msg.angular_velocity.z
 
-        self.imu_measurement[3][0] = state_msg.linear_acceleration.x
-        self.imu_measurement[4][0] = state_msg.linear_acceleration.y
-        self.imu_measurement[5][0] = state_msg.linear_acceleration.z
+        self.imu_measurement[3] = state_msg.linear_acceleration.x
+        self.imu_measurement[4] = state_msg.linear_acceleration.y
+        self.imu_measurement[5] = state_msg.linear_acceleration.z
 
         # breakpoint()
         if(self.dt > self.DT_MIN and self.dt < self.DT_MAX):
@@ -216,7 +233,6 @@ class Inekf(Node):
         new_p = new_state.getPosition()
         new_v = new_r.T @ new_state.getX()[0:3,3:4]
         #self.get_logger().info('imu measure ' + str(self.imu_measurement_prev))
-        #self.get_logger().info('Position ' + str(new_p))
 
         quat = pin.Quaternion(new_r)
         quat.normalize()
@@ -241,13 +257,13 @@ class Inekf(Node):
         self.odom_msg.pose.pose.orientation.z = quat.z
         self.odom_msg.pose.pose.orientation.w = quat.w 
 
-        self.odom_msg.twist.twist.linear.x = float(new_v[0])
-        self.odom_msg.twist.twist.linear.y = float(new_v[1])
-        self.odom_msg.twist.twist.linear.z = float(new_v[2])
+        self.odom_msg.twist.twist.linear.x = new_v[0][0]
+        self.odom_msg.twist.twist.linear.y = new_v[1][0]
+        self.odom_msg.twist.twist.linear.z = new_v[2][0]
 
-        self.odom_msg.twist.twist.angular.x = float(self.imu_measurement_prev[0])
-        self.odom_msg.twist.twist.angular.y = float(self.imu_measurement_prev[1])
-        self.odom_msg.twist.twist.angular.z = float(self.imu_measurement_prev[2])
+        self.odom_msg.twist.twist.angular.x = self.imu_measurement_prev[0]
+        self.odom_msg.twist.twist.angular.y = self.imu_measurement_prev[1]
+        self.odom_msg.twist.twist.angular.z = self.imu_measurement_prev[2]
         
 
         self.tf_broadcaster.sendTransform(self.transform_msg)
