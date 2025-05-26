@@ -10,6 +10,7 @@ from nav_msgs.msg import Odometry
 from go2_odometry.msg import OdometryVector
 import pinocchio as pin
 
+import copy
 from sensor_msgs.msg import Imu
 from tf2_ros import TransformBroadcaster
 from geometry_msgs.msg import TransformStamped
@@ -111,15 +112,22 @@ class Inekf(Node):
         self.t = state_msg.header.stamp.sec + state_msg.header.stamp.nanosec * 1e-9 
 
         pose_vec = state_msg.pose_vec
+        vel_vec = state_msg.vel_vec
         contact_states = state_msg.contact_states
         #self.get_logger().info('Feet in contact ' + str(state_msg.feet_names))
         
         contact_list = []
         kinematics_list = []
 
+        current_base_rotation = self.filter.getState().getRotation()
+
         for i in range(len(self.foot_frame_name)):
             contact_list.append((i, contact_states[i]))
             pose = pose_vec[i]
+
+            full_cov = pose.covariance[:9]
+            full_cov = np.squeeze(full_cov)
+            full_cov = full_cov.reshape(3,3)
             
             quat = pin.Quaternion(pose.pose.orientation.w,
                                   pose.pose.orientation.x, 
@@ -200,7 +208,6 @@ class Inekf(Node):
         new_v = new_r.T @ new_state.getX()[0:3,3:4]
         new_v = new_v.reshape(-1)
         #self.get_logger().info('imu measure ' + str(self.imu_measurement_prev))
-        #self.get_logger().info('Position ' + str(new_p))
 
         quat = pin.Quaternion(new_r)
         quat.normalize()
