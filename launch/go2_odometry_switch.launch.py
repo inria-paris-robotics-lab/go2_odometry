@@ -9,7 +9,7 @@ def generate_launch_description():
 
     odom_type_arg = DeclareLaunchArgument(
         'odom_type',
-        default_value='use_full_odom',
+        default_value='use_inekf_odom',
         description='Type of odometry desired between : fake, mocap'
     )
 
@@ -62,7 +62,7 @@ def generate_launch_description():
     full_state_publisher_launch_file = PathJoinSubstitution([
                                     FindPackageShare('go2_odometry'),
                                     'launch',
-                                    'go2_full_odometry.launch.py'
+                                    'go2_inekf_odometry.launch.py'
                                   ])
 
     return LaunchDescription([
@@ -90,7 +90,7 @@ def generate_launch_description():
         IncludeLaunchDescription
         (
             PythonLaunchDescriptionSource([full_state_publisher_launch_file]),
-            condition=IfCondition(PythonExpression(["'",LaunchConfiguration('odom_type'),"' == 'use_full_odom'"]))
+            condition=IfCondition(PythonExpression(["'",LaunchConfiguration('odom_type'),"' == 'use_inekf_odom'"]))
         )
 
 ])
