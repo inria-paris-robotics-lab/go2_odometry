@@ -11,9 +11,32 @@ find_package(rclpy REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(unitree_go REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(pinocchio REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(inekf REQUIRED)
+find_package(builtin_interfaces REQUIRED)
+find_package(go2_description REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
+
+unset(PYTHON_SOABI)
+
+# Build msgs
+set(msg_files
+  "msg/OdometryVector.msg"
+)
+
+rosidl_generate_interfaces(${PROJECT_NAME}
+  ${msg_files}
+  DEPENDENCIES builtin_interfaces std_msgs sensor_msgs
+)
 
 add_executable(state_converter_node src/go2_state_converter_node.cpp)
 ament_target_dependencies(state_converter_node rclcpp unitree_go sensor_msgs)
+
+rosidl_target_interfaces(state_converter_node 
+  ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 install(TARGETS
   state_converter_node
@@ -31,12 +54,6 @@ install(PROGRAMS
 # Install launch files.
 install(DIRECTORY
   launch
-  DESTINATION share/${PROJECT_NAME}/
-)
-
-# Install config files.
-install(DIRECTORY
-  config
   DESTINATION share/${PROJECT_NAME}/
 )
 

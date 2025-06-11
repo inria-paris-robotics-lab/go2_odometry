@@ -62,7 +62,7 @@ def generate_launch_description():
     full_state_publisher_launch_file = PathJoinSubstitution([
                                     FindPackageShare('go2_odometry'),
                                     'launch',
-                                    'go2_full_odometry.launch.py'
+                                    'go2_inekf_odometry.launch.py'
                                   ])
 
     return LaunchDescription([
