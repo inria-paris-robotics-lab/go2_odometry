@@ -140,13 +140,27 @@ class Inekf(Node):
             translation[1] = pose.pose.position.y
             translation[2] = pose.pose.position.z
 
+
             contact_cov = pose.covariance[:9]
             contact_cov = np.squeeze(contact_cov)
             contact_cov = contact_cov.reshape(3,3)
 
-            velocity = np.zeros(3)
+            contact_velocity = np.zeros(3)
+            contact_velocity[0] = vel_vec[i].x
+            contact_velocity[1] = vel_vec[i].y
+            contact_velocity[2] = vel_vec[i].z
+            contact_velocity = current_base_rotation.transpose() @ contact_velocity
+            
+            # Only if vel_foot is an approximate of velocity base (no sliding)
+            """ vel_foot_in_local = vel_foot + np.cross(self.imu_measurement[:3], translation)
+            vel_foot_in_local = current_base_rotation @ vel_foot_in_local
 
-            kinematics = Kinematics(i, translation, contact_cov, velocity, np.eye(3) * 0.001)
+            velocity_base = -vel_foot_in_local """
+            cov_vel_base = np.eye(3) * 0.001
+
+            cov_vel_slip = np.eye(3) * 1e-6
+
+            kinematics = Kinematics(i, translation, full_cov, np.zeros(3), cov_vel_base, np.zeros(3), cov_vel_slip)
             kinematics_list.append(kinematics)
 
             #self.get_logger().info('Base contact of ' + self.foot_frame_name[i] + ' is ' + str(pose_matrix[:3,3]))

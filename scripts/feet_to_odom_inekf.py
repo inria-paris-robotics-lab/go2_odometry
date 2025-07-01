@@ -13,13 +13,7 @@ import numpy as np
 import pinocchio as pin
 from go2_description.loader import loadGo2
 import coal
-from simulation_args import SimulationArgs
-from simulation_utils import (
-    removeBVHModelsIfAny,
-    setPhysicsProperties,
-    Simulation,
-    addSystemCollisionPairs
-)
+import simple
 
 class FeetToOdom(Node):
 
@@ -33,16 +27,14 @@ class FeetToOdom(Node):
             self.listener_callback,
             10)
         self.cmd_subscription =  self.create_subscription(LowCmd, "/lowcmd", self.listener_callback_cmd, 10)
-        #self.odom_subscription =  self.create_subscription(Odometry, "/odometry/filtered", self.listener_callback_odom, 10)
+        self.odom_subscription =  self.create_subscription(Odometry, "/odometry/filtered", self.listener_callback_odom, 10)
         self.tau_cmd = np.zeros(12)
         self.estimate_force = np.zeros(12)
-
-        self.qbase = np.zeros(7)
         self.vbase = np.zeros(6)
-        self.qbase[6] = 1
 
         self.robot = loadGo2()
         self.rmodel = self.robot.model
+        # Deactivate kinematics limits and friction
         for i in range(self.rmodel.nq):
             self.rmodel.lowerPositionLimit[i] = np.finfo("d").min
             self.rmodel.upperPositionLimit[i] = np.finfo("d").max
@@ -62,48 +54,35 @@ class FeetToOdom(Node):
         
         ### Force estimation via Simple
         # Set Simulator
-        q0 = np.array([ 0.   ,  0.   ,  0,  0.   ,  0.   ,  0.   ,  1.   ,  
-                       0.068, 0.785, -1.44 , -0.068,  0.785, -1.44 ,  
+        q0 = np.array([ 0.,  0.,  0.,  0.,  0.,  0.,  1.,  
+                       0.068, 0.785, -1.44 , -0.068,  0.785, -1.44,  
                        0.068,  0.785, -1.44 ,-0.068,  0.785, -1.44 ])
         self.q_previous = copy.deepcopy(q0)
         self.v_previous = np.zeros(18)
-        args = SimulationArgs()
-        setPhysicsProperties(geom_model, args.material, args.compliance)
-        removeBVHModelsIfAny(geom_model)
-        addSystemCollisionPairs(self.rmodel, geom_model, q0)
+        # Set physics property of geometry
+        for gobj in geom_model.geometryObjects:
+            gobj.physicsMaterial.materialType = pin.PhysicsMaterialType.METAL
 
-        self.contact_modes = [#[1, 1, 1, 1],
-                 [0, 0, 0, 0],
-                 [1, 0, 0, 0],
-                 [1, 1, 0, 0],
-                 #[1,1,1,0],
-                 #[0,1,1,1],
-                 [0,0,1,1],
-                 [0,0,0,1],
-                 [0,1,1,0],
-                 [1,0,0,1],
-                 [0,1,0,1],
-                 [1,0,1,0],
-                 [0,0,1,0],
-                 [0,1,0,0],
-                 #[1,0,1,1],
-                 #[1,1,0,1]               
-        ]
-        self.fext = [pin.Force(np.zeros(6)) for _ in range(self.robot.model.njoints)]
-        self.dt_sim = 1e-2
+            # Compliance
+            gobj.physicsMaterial.compliance = 0.0
+        
+        # Remove BVHModels if any
+        for gobj in geom_model.geometryObjects:
+            gobj: pin.GeometryObject
+            bvh_types = [coal.BV_OBBRSS, coal.BV_OBB, coal.BV_AABB]
+            ntype = gobj.geometry.getNodeType()
+            if ntype in bvh_types:
+                gobj.geometry.buildConvexHull(True, "Qt")
+                gobj.geometry = gobj.geometry.convex
 
-        # Remove all pair of collision
-        i = 0
-        while i < len(geom_model.collisionPairs):
-            cp = geom_model.collisionPairs[i]
-            geom_model.removeCollisionPair(cp)
+        self.dt_sim = 1e-3
         
         # Add one collision pair per foot
         pin.forwardKinematics(self.rmodel, self.rdata, q0)
         pin.updateFramePlacements(self.rmodel, self.rdata)
         universe_fid = self.rmodel.getFrameId("universe")
         universe_jid = self.rmodel.frames[universe_fid].parentJoint
-        self.radius = 0.01
+        self.radius = 0.1
         for name in self.feet_names:
             foot_id = self.rmodel.getFrameId(name)
             geom_name = name + "_0"
@@ -119,8 +98,36 @@ class FeetToOdom(Node):
             ig_frame = geom_model.addGeometryObject(geom_object)
             geom_model.addCollisionPair(pin.CollisionPair(ig_frame, geom_id))
         
-        # Create the simulator objectconstraints_forces
-        self.simulator = Simulation(self.rmodel, geom_model, visual_model, q0, np.zeros(self.rmodel.nv), args) 
+        # Create the simulator object
+        data = self.rmodel.createData()
+        geom_data = geom_model.createData()
+        self.simulator = simple.Simulator(self.rmodel, data, geom_model, geom_data)
+        self.simulator.contact_solver_info = pin.ProximalSettings(
+            1e-8, 1e-8, 1e-4, 100
+        )
+        self.simulator.warm_start_constraint_forces = 1
+        self.simulator.measure_timings = False
+        # Contact patch settings
+        self.simulator.constraints_problem.setMaxNumberOfContactsPerCollisionPair(1)
+        # Baumgarte settings
+        self.simulator.constraints_problem.Kp = 0
+        self.simulator.constraints_problem.Kd = 0
+        self.simulator.admm_constraint_solver_settings.admm_update_rule = (
+            pin.ADMMUpdateRule.SPECTRAL
+        )
+
+        # Change friction coefficient
+        # Constraints ID is [4, 7, 10, 13]
+        mu_friction = .086
+        nb_cstr = len(self.simulator.constraints_problem.frictional_point_constraint_models.tolist())
+        for i in range(nb_cstr):
+            if self.simulator.constraints_problem.frictional_point_constraint_models[i].extract().joint2_id == 4 or \
+            self.simulator.constraints_problem.frictional_point_constraint_models[i].extract().joint2_id == 7:
+                self.simulator.constraints_problem.frictional_point_constraint_models[i].extract().set.mu = mu_friction
+            else:
+                self.simulator.constraints_problem.frictional_point_constraint_models[i].extract().set.mu = 1
+
+        self.simulator.reset()
 
 
     def _unitree_to_urdf_vec(self, vec):
@@ -136,48 +143,35 @@ class FeetToOdom(Node):
             feet_trans = copy.deepcopy(feet_translation[ij])
             feet_trans[2] -= self.radius
             feet_trans[2] -= z_offsets[ij]
-            geom_id = self.simulator.simulator.geom_model.getGeometryId(geom_name)
-            self.simulator.simulator.geom_model.geometryObjects[geom_id].placement.translation = feet_trans
+            geom_id = self.simulator.geom_model.getGeometryId(geom_name)
+            self.simulator.geom_model.geometryObjects[geom_id].placement.translation = feet_trans
             ij += 1
     
-    def listener_callback_cmd(self, cmd_msg):
-        tau_unitree = [j.tau for j in cmd_msg.motor_cmd]
-        self.tau_cmd = np.array(self._unitree_to_urdf_vec(tau_unitree))
-    
-    """ def listener_callback_odom(self, odom_msg):
-        self.qbase[0] = odom_msg.pose.pose.position.x
-        self.qbase[1] = odom_msg.pose.pose.position.y
-        self.qbase[2] = odom_msg.pose.pose.position.z
-        self.qbase[3] = odom_msg.pose.pose.orientation.x
-        self.qbase[4] = odom_msg.pose.pose.orientation.y
-        self.qbase[5] = odom_msg.pose.pose.orientation.z
-        self.qbase[6] = odom_msg.pose.pose.orientation.w
-        
+    def listener_callback_odom(self, odom_msg):
         self.vbase[0] = odom_msg.twist.twist.linear.x
         self.vbase[1] = odom_msg.twist.twist.linear.y
         self.vbase[2] = odom_msg.twist.twist.linear.z
         self.vbase[3] = odom_msg.twist.twist.angular.x
         self.vbase[4] = odom_msg.twist.twist.angular.y
-        self.vbase[5] = odom_msg.twist.twist.angular.z """
-
-
+        self.vbase[5] = odom_msg.twist.twist.angular.z
+    
+    def listener_callback_cmd(self, cmd_msg):
+        tau_unitree = [j.tau for j in cmd_msg.motor_cmd]
+        self.tau_cmd = np.array(self._unitree_to_urdf_vec(tau_unitree))
 
     def listener_callback(self, state_msg):
         # Get sensor measurement
         q_unitree = [j.q for j in state_msg.motor_state[:12]]
         v_unitree = [j.dq for j in state_msg.motor_state[:12]]
-        tau_unitree = [j.tau_est for j in state_msg.motor_state[:12]]
         fc_unitree = state_msg.foot_force
 
         # Rearrange joints according to urdf
         q = np.array([0]*6 + [1] + self._unitree_to_urdf_vec(q_unitree))
-        v = np.array([0]*6 + self._unitree_to_urdf_vec(v_unitree))
-        tau = self._unitree_to_urdf_vec(tau_unitree)
-        #qworld = np.concatenate((self.qbase, self._unitree_to_urdf_vec(q_unitree)))
-        #vworld = np.concatenate((self.vbase, self._unitree_to_urdf_vec(v_unitree)))
-        #x_measured = np.concatenate((qworld, vworld))
+        v = np.concatenate((self.vbase, np.array(self._unitree_to_urdf_vec(v_unitree))))
         f_contact = [fc_unitree[i] for i in [1, 0, 3, 2]]
-
+        
+        # Go out of initialization phase if tau_cmd is non trivial
+        # (meaning that MPC has started)
         if np.max(self.tau_cmd) > 1:
             self.initialize_pose = False
             #self.get_logger().info('Initialization over')
@@ -187,58 +181,36 @@ class FeetToOdom(Node):
         pin.forwardKinematics(self.rmodel, self.rdata, q, v)
         pin.updateFramePlacements(self.rmodel, self.rdata)
         pin.computeJointJacobians(self.rmodel, self.rdata)
-        bMf_list = [self.rdata.oMf[id] for id in self.foot_frame_id]
         bMf_trans_list = [self.rdata.oMf[id].translation for id in self.foot_frame_id]
+
+        # Compute local foot velocity for velocity base estimation
+        # Base position and velocity must be zero for the estimation to be accurate
+        # Does not work with sliding
         foot_vel_list = []
         for i in range(4):
             vpin = pin.getFrameVelocity(self.rmodel, self.rdata, self.foot_frame_id[i], pin.LOCAL_WORLD_ALIGNED)
             foot_vel_list.append(vpin.linear)
-        
-        """ pin.forwardKinematics(self.rmodel, self.rdata, qworld)
-        pin.updateFramePlacements(self.rmodel, self.rdata)
-        world_feet_pose = [self.rdata.oMf[id].translation for id in self.foot_frame_id] """
-
 
         ### Estimate force and contact
         torque_simple = np.zeros(18)
         torque_simple[6:] = self.tau_cmd #tau
         
         self.setContactPose(bMf_trans_list)
-        self.simulator.simulator.stepPGS(q, v, torque_simple, self.fext, self.dt_sim)
-        forces_simple = self.simulator.simulator.constraints_problem.frictional_point_constraints_forces
-        col_pairs = self.simulator.simulator.constraints_problem.pairs_in_collision
+        self.simulator.step(q, v, torque_simple, self.dt_sim)
+        forces_simple = self.simulator.constraints_problem.frictional_point_constraints_forces
+        velocities_simple = self.simulator.constraints_problem.frictional_point_constraints_velocities
+        col_pairs = self.simulator.constraints_problem.pairs_in_collision
 
         id_count = 0
         m_force = np.zeros(12)
+        m_velocity = np.zeros(12)
         for i in range(4):
             if i in col_pairs:
                 m_force[i * 3:i * 3 + 3] = forces_simple[id_count:id_count + 3]
+                m_velocity[i * 3] = velocities_simple[id_count + 1]
+                m_velocity[i * 3 + 1] = -velocities_simple[id_count]
+                m_velocity[i * 3 + 2] = velocities_simple[id_count + 2]
                 id_count += 3
-
-        """ col_pairs_list = []
-        force_simple_list = []
-        norm_diff_v = []
-        
-        for cm in self.contact_modes:
-            self.setContactPose(bMf_trans_list, cm)
-            self.simulator.simulator.stepPGS(self.q_previous, self.v_previous, torque_simple, self.fext, self.dt_sim)
-            forces_simple = self.simulator.simulator.constraints_problem.frictional_point_constraints_forces
-            col_pairs = self.simulator.simulator.constraints_problem.pairs_in_collision
-
-            force_simple_list.append(forces_simple)
-            col_pairs_list.append(col_pairs.tolist()[:])
-            norm_diff_v.append(np.linalg.norm(self.simulator.simulator.vnew[6:] - v[6:]))
-        
-        id_min = np.argmin(norm_diff_v)
-        m_force = np.zeros(12)
-        id_count = 0
-        for i in range(4):
-            if i in col_pairs_list[id_min]:
-                m_force[i * 3:i * 3 + 3] = force_simple_list[id_min][id_count:id_count + 3]
-                id_count += 3
-        
-        self.q_previous = q
-        self.v_previous = v """
        
         # Filter force estimates
         b = 0.
@@ -265,26 +237,22 @@ class FeetToOdom(Node):
             pose_foot.covariance = [0.] * 36
             pose_foot.covariance[:9] = cov_pose.flatten().tolist()
 
-            pose_foot.pose.position.x = bMf_list[i].translation[0]
-            pose_foot.pose.position.y = bMf_list[i].translation[1]
-            pose_foot.pose.position.z = bMf_list[i].translation[2]
+            pose_foot.pose.position.x = bMf_trans_list[i][0]
+            pose_foot.pose.position.y = bMf_trans_list[i][1]
+            pose_foot.pose.position.z = bMf_trans_list[i][2]
 
             force_foot.x = self.estimate_force[i * 3]
             force_foot.y = self.estimate_force[1 + i * 3]
             force_foot.z = self.estimate_force[2 + i * 3]
             
-            vel_foot.x = foot_vel_list[i][0]
-            vel_foot.y = foot_vel_list[i][1]
-            vel_foot.z = foot_vel_list[i][2]
+            vel_foot.x = m_velocity[i * 3] #foot_vel_list[i][0]
+            vel_foot.y = m_velocity[i * 3 + 1] #foot_vel_list[i][1]
+            vel_foot.z = m_velocity[i * 3 + 2] #foot_vel_list[i][2]
             
-
-            quat = pin.Quaternion(bMf_list[i].rotation)
-            quat.normalize()
-            
-            pose_foot.pose.orientation.x = quat.x
-            pose_foot.pose.orientation.y = quat.y
-            pose_foot.pose.orientation.z = quat.z
-            pose_foot.pose.orientation.w = quat.w
+            pose_foot.pose.orientation.x = 0.
+            pose_foot.pose.orientation.y = 0.
+            pose_foot.pose.orientation.z = 0.
+            pose_foot.pose.orientation.w = 1.
 
             pos_list.append(pose_foot)
             force_list.append(force_foot)
