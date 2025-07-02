@@ -1,6 +1,5 @@
 #!/bin/env python3
 
-import math
 import numpy as np
 
 import rclpy
@@ -58,11 +57,10 @@ class Inekf(Node):
 
 
         # Data from go2 ========================================================
-        self.imu_measurement = np.zeros((6,1))
-        self.imu_measurement_prev = np.zeros((6,1))
-        self.quaternion_measurement = np.zeros((4))
-        self.quaternion = np.zeros((4,1))
-        self.feet_contacts = np.zeros((4))
+        self.imu_measurement = np.zeros(6)
+        self.imu_measurement_prev = np.zeros(6)
+        self.quaternion_measurement = np.zeros(4)
+        self.feet_contacts = np.zeros(4)
         self.contacts={0:False,
                        1:False,
                        2:False,
@@ -134,15 +132,13 @@ class Inekf(Node):
             translation[1] = pose.pose.position.y
             translation[2] = pose.pose.position.z
 
+            contact_cov = pose.covariance[:9]
+            contact_cov = np.squeeze(contact_cov)
+            contact_cov = contact_cov.reshape(3,3)
+
             velocity = np.zeros(3)
 
-            kinematics = Kinematics()
-            kinematics.id = i
-            kinematics.position = translation
-            kinematics.velocity = velocity
-            kinematics.covariance = np.eye(3) * 0.001 #pose.covariance
-            kinematics.covariance_vel = np.eye(3) * 0.001 #pose.covariance
-
+            kinematics = Kinematics(i, translation, contact_cov, velocity, np.eye(3) * 0.001)
             kinematics_list.append(kinematics)
 
             #self.get_logger().info('Base contact of ' + self.foot_frame_name[i] + ' is ' + str(pose_matrix[:3,3]))
@@ -151,19 +147,6 @@ class Inekf(Node):
         #self.get_logger().info('Contact list' + str(contact_list))
         self.filter.setContacts(contact_list)
         self.filter.correctKinematics(kinematics_list)
-        #new_state = self.filter.getState()
-        #new_X = new_state.getX()
-        #for i in range(len(kinematics_list)):
-        #    new_X[2, 5 + i] = 0.023 
-        #new_state.setX(new_X)
-        #self.filter.setState(new_state)
-        #self.get_logger().info('Correct kinematics ' + str(new_pose))
-        """ if len(kinematics_list) > 0:
-            exit() """
-        """ if np.isnan(new_pose[0]):
-            exit() """
-
-
 
 
     def listener_callback(self, state_msg):
@@ -173,13 +156,13 @@ class Inekf(Node):
     
         # IMU measurement - used for propagation ===============================
         #! gyroscope meas in filter are radians
-        self.imu_measurement[0][0] = state_msg.angular_velocity.x
-        self.imu_measurement[1][0] = state_msg.angular_velocity.y
-        self.imu_measurement[2][0] = state_msg.angular_velocity.z
+        self.imu_measurement[0] = state_msg.angular_velocity.x
+        self.imu_measurement[1] = state_msg.angular_velocity.y
+        self.imu_measurement[2] = state_msg.angular_velocity.z
 
-        self.imu_measurement[3][0] = state_msg.linear_acceleration.x
-        self.imu_measurement[4][0] = state_msg.linear_acceleration.y
-        self.imu_measurement[5][0] = state_msg.linear_acceleration.z
+        self.imu_measurement[3] = state_msg.linear_acceleration.x
+        self.imu_measurement[4] = state_msg.linear_acceleration.y
+        self.imu_measurement[5] = state_msg.linear_acceleration.z
 
         # breakpoint()
         if(self.dt > self.DT_MIN and self.dt < self.DT_MAX):
@@ -215,6 +198,7 @@ class Inekf(Node):
         new_r = new_state.getRotation()
         new_p = new_state.getPosition()
         new_v = new_r.T @ new_state.getX()[0:3,3:4]
+        new_v = new_v.reshape(-1)
         #self.get_logger().info('imu measure ' + str(self.imu_measurement_prev))
         #self.get_logger().info('Position ' + str(new_p))
 
@@ -241,13 +225,13 @@ class Inekf(Node):
         self.odom_msg.pose.pose.orientation.z = quat.z
         self.odom_msg.pose.pose.orientation.w = quat.w 
 
-        self.odom_msg.twist.twist.linear.x = new_v[0][0]
-        self.odom_msg.twist.twist.linear.y = new_v[1][0]
-        self.odom_msg.twist.twist.linear.z = new_v[2][0]
+        self.odom_msg.twist.twist.linear.x = new_v[0]
+        self.odom_msg.twist.twist.linear.y = new_v[1]
+        self.odom_msg.twist.twist.linear.z = new_v[2]
 
-        self.odom_msg.twist.twist.angular.x = self.imu_measurement_prev[0][0]
-        self.odom_msg.twist.twist.angular.y = self.imu_measurement_prev[1][0]
-        self.odom_msg.twist.twist.angular.z = self.imu_measurement_prev[2][0]
+        self.odom_msg.twist.twist.angular.x = self.imu_measurement_prev[0]
+        self.odom_msg.twist.twist.angular.y = self.imu_measurement_prev[1]
+        self.odom_msg.twist.twist.angular.z = self.imu_measurement_prev[2]
         
 
         self.tf_broadcaster.sendTransform(self.transform_msg)

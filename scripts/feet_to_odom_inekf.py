@@ -23,10 +23,12 @@ class FeetToOdom(Node):
             self.listener_callback,
             10)
 
-        self.robot = loadGo2()
+        robot = loadGo2()
+        self.rmodel = robot.model
+        self.rdata = self.rmodel.createData()
         self.foot_frame_name = [prefix + "_foot" for prefix in ["FL", "FR", "RL", "RR"]]
-        self.foot_frame_id = [self.robot.model.getFrameId(frame_name) for frame_name in self.foot_frame_name]
-        self.imu_frame_id = self.robot.model.getFrameId("imu")
+        self.foot_frame_id = [self.rmodel.getFrameId(frame_name) for frame_name in self.foot_frame_name]
+        self.imu_frame_id = self.rmodel.getFrameId("imu")
         self.initialize_pose = True
 
     def _unitree_to_urdf_vec(self, vec):
@@ -52,9 +54,10 @@ class FeetToOdom(Node):
 
         # Compute positions and velocities
         ## f = foot, i = imu, b = base
-        self.robot.forwardKinematics(q, v)
-        pin.updateFramePlacements(self.robot.model, self.robot.data)
-        bMf_list = [self.robot.data.oMf[id] for id in self.foot_frame_id]
+        pin.forwardKinematics(self.rmodel, self.rdata, q, v)
+        pin.updateFramePlacements(self.rmodel, self.rdata)
+        pin.computeJointJacobians(self.rmodel, self.rdata)
+        bMf_list = [self.rdata.oMf[id] for id in self.foot_frame_id]
 
         # Make message
         pos_msg = OdometryVector()
@@ -67,7 +70,11 @@ class FeetToOdom(Node):
             else:
                 feet_list.append(False)
             pose_foot = PoseWithCovariance()
+            
+            Jc = pin.getFrameJacobian(self.rmodel, self.rdata, self.foot_frame_id[i], pin.LOCAL)[:3,6:]
+            cov_pose = Jc @ np.eye(12) * 1e-3 @ Jc.transpose()
             pose_foot.covariance = [0.] * 36
+            pose_foot.covariance[:9] = cov_pose.flatten().tolist()
 
             pose_foot.pose.position.x = bMf_list[i].translation[0]
             pose_foot.pose.position.y = bMf_list[i].translation[1]
