@@ -48,7 +48,6 @@ class FeetToOdom(Node):
         self.initialize_pose = True
         
         geom_model = self.robot.collision_model
-        visual_model = self.robot.visual_model
         self.rdata = self.rmodel.createData()
         self.feet_names = ["FL_foot", "FR_foot", "RL_foot", "RR_foot"]
         
@@ -125,7 +124,7 @@ class FeetToOdom(Node):
 
         # Change friction coefficient
         # Constraints ID is [4, 7, 10, 13]
-        mu_friction = .086
+        mu_friction = .3
         nb_cstr = len(self.simulator.constraints_problem.frictional_point_constraint_models.tolist())
         for i in range(nb_cstr):
             if self.simulator.constraints_problem.frictional_point_constraint_models[i].extract().joint2_id == 4 or \
@@ -142,7 +141,7 @@ class FeetToOdom(Node):
                  vec[0],  vec[1],  vec[2],
                  vec[9],  vec[10], vec[11],
                  vec[6],  vec[7],  vec[8],]
-    
+
     def setContactPose(self, feet_translation, z_offsets = [0, 0, 0, 0]):
         ij = 0
         for name in self.feet_names:
@@ -174,7 +173,7 @@ class FeetToOdom(Node):
 
         # Rearrange joints according to urdf
         q = np.array([0]*6 + [1] + self._unitree_to_urdf_vec(q_unitree))
-        v = np.concatenate((self.vbase, np.array(self._unitree_to_urdf_vec(v_unitree))))
+        v = np.concatenate((np.zeros(6), np.array(self._unitree_to_urdf_vec(v_unitree)))) #self.vbase
         f_contact = [fc_unitree[i] for i in [1, 0, 3, 2]]
         
         # Go out of initialization phase if tau_cmd is non trivial
@@ -201,12 +200,34 @@ class FeetToOdom(Node):
         ### Estimate force and contact
         torque_simple = np.zeros(18)
         torque_simple[6:] = self.tau_cmd #tau
+
+        ### Determine if contact from sensor pressure
+        feet_contact_offset = []
+        feet_list = []
+        for i in range(4):
+            #f_contact[i] >= 20  self.estimate_force[2 + i * 3] >= 10
+            if (self.initialize_pose):
+                feet_list.append(True)
+                feet_contact_offset.append(0)
+            else:
+                if (f_contact[i] >= 30 and i < 2):
+                    feet_list.append(True)
+                    feet_contact_offset.append(0)
+                elif (f_contact[i] >= 20 and i > 1):
+                    feet_list.append(True)
+                    feet_contact_offset.append(0)
+                else:
+                    feet_list.append(False)
+                    feet_contact_offset.append(1)
         
-        self.setContactPose(bMf_trans_list)
+        self.setContactPose(bMf_trans_list, feet_contact_offset)
         self.simulator.step(q, v, torque_simple, self.dt_sim)
         forces_simple = self.simulator.constraints_problem.frictional_point_constraints_forces
         velocities_simple = self.simulator.constraints_problem.frictional_point_constraints_velocities
         col_pairs = self.simulator.constraints_problem.pairs_in_collision
+
+        #self.get_logger().info('Collision pair is ' + str(col_pairs.tolist()))
+        #self.get_logger().info('forces_simple is ' + str(forces_simple))
 
         id_count = 0
         m_force = np.zeros(12)
@@ -227,14 +248,9 @@ class FeetToOdom(Node):
         pos_msg = OdometryVector()
         pos_msg.header.stamp = self.get_clock().now().to_msg()
         pos_list = []
-        feet_list = []
         force_list = []
         vel_list = []
         for i in range(4):
-            if(f_contact[i] >= 20  or self.initialize_pose): #f_contact[i] >= 20  self.estimate_force[2 + i * 3] >= 10
-                feet_list.append(True)
-            else:
-                feet_list.append(False)
             pose_foot = PoseWithCovariance()
             force_foot = Vector3()
             vel_foot = Vector3()
