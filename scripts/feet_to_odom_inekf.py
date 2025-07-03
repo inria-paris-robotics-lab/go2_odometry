@@ -102,9 +102,16 @@ class FeetToOdom(Node):
         data = self.rmodel.createData()
         geom_data = geom_model.createData()
         self.simulator = simple.Simulator(self.rmodel, data, geom_model, geom_data)
-        self.simulator.contact_solver_info = pin.ProximalSettings(
-            1e-8, 1e-8, 1e-4, 100
-        )
+
+        self.simulator.admm_constraint_solver_settings.absolute_precision = 1e-8
+        self.simulator.admm_constraint_solver_settings.relative_precision = 1e-8
+        self.simulator.admm_constraint_solver_settings.max_iter = 100
+        self.simulator.admm_constraint_solver_settings.mu = 1e-4
+        # pgs 
+        self.simulator.pgs_constraint_solver_settings.absolute_precision = 1e-8
+        self.simulator.pgs_constraint_solver_settings.relative_precision = 1e-8
+        self.simulator.pgs_constraint_solver_settings.max_iter = 100
+
         self.simulator.warm_start_constraint_forces = 1
         self.simulator.measure_timings = False
         # Contact patch settings

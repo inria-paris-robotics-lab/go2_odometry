@@ -160,7 +160,8 @@ class Inekf(Node):
 
             cov_vel_slip = np.eye(3) * 1e-6
 
-            kinematics = Kinematics(i, translation, full_cov, np.zeros(3), cov_vel_base, np.zeros(3), cov_vel_slip)
+            kinematics = Kinematics(i, translation, full_cov, np.zeros(3), cov_vel_base, contact_velocity, cov_vel_slip)
+            #kinematics = Kinematics(i, translation, full_cov, np.zeros(3), cov_vel_base)
             kinematics_list.append(kinematics)
 
             #self.get_logger().info('Base contact of ' + self.foot_frame_name[i] + ' is ' + str(pose_matrix[:3,3]))
