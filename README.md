@@ -66,15 +66,6 @@ It then publishes on:
 * `/tf`: The floating base pose estimation
 * `/odometry/filtered`: The same pose estimate with covariances.
 
-##### go2_odometry/feet_to_odom_inekf.py
-Runs an inverse kinematics calculation on the robot joints to get foot pose. It also compute the jacobians to set covariance matrix appropriately.
-
-This node subscribes to:
-* `unitree_ros2/LowState`: To get joint configuration and **foot_force** to determine if the foot is in contact with the ground or not.
-
-It the publishes on:
-*`/odometry/feet_pos`: For the inekf node to consume.
-
 ---
 ### go2_mocap.launch.py
 Connects to a Qualisys Motion Capture and converts the data recevied in the expected output format of an odometry node of our Go2 stack. This allows to have a "perfect" odometry node that contains the ground truth data.

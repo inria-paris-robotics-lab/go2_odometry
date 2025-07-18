@@ -10,7 +10,7 @@ from nav_msgs.msg import Odometry
 
 class FakeOdometryNode(Node):
     def __init__(self):
-        super().__init__("feet_to_odom")
+        super().__init__("fake_odometry")
 
         self.declare_parameter("base_height", 0.30)
         self.declare_parameter("base_frame", "base")

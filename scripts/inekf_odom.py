@@ -5,15 +5,15 @@ import numpy as np
 import rclpy
 from rclpy.node import Node
 
-from rclpy.qos import QoSProfile
 from nav_msgs.msg import Odometry
-from go2_odometry.msg import OdometryVector
+from unitree_go.msg import LowState
 import pinocchio as pin
 
-from sensor_msgs.msg import Imu
 from tf2_ros import TransformBroadcaster
 from geometry_msgs.msg import TransformStamped
+from rcl_interfaces.msg import ParameterDescriptor as PD
 from inekf import RobotState, NoiseParams, InEKF, Kinematics
+from go2_description.loader import loadGo2
 
 
 # ==============================================================================
@@ -22,208 +22,193 @@ from inekf import RobotState, NoiseParams, InEKF, Kinematics
 class Inekf(Node):
     def __init__(self):
         super().__init__("inekf")
-        print("==GO2 InEKF launched==")
-        # ROS2 =================================================================
-        self.declare_parameter("base_frame", "base")
-        self.declare_parameter("odom_frame", "odom")
 
-        qos_profile_keeplast = QoSProfile(history=rclpy.qos.HistoryPolicy.KEEP_LAST, depth=1)
-        self.pos_feet_subscriber = self.create_subscription(
-            OdometryVector, "odometry/feet_pos", self.listener_feet_callback, qos_profile_keeplast
+        # Ros params
+        # fmt: off
+        self.declare_parameters(
+            namespace="",
+            parameters=[
+                ("base_frame", "base", PD(description="Robot base frame name (for TF)")),
+                ("odom_frame", "odom", PD(description="World frame name (for TF)")),
+                ("robot_freq", 500.0, PD(description="Frequency at which the robot publish its state")),
+                ("gyroscope_noise", 0.01, PD(description="Inekf covariance value")),
+                ("accelerometer_noise", 0.1, PD(description="Inekf covariance value")),
+                ("gyroscopeBias_noise", 0.00001, PD(description="Inekf covariance value")),
+                ("accelerometerBias_noise", 0.0001, PD(description="Inekf covariance value")),
+                ("contact_noise", 0.001, PD(description="Inekf covariance value")),
+                ("joint_position_noise", 0.001, PD(description="Noise on joint configuration measurements to project using jacobian")),
+                ("contact_velocity_noise", 0.001, PD(description="Noise on contact velocity")),
+            ],
         )
-        self.imu_subscription = self.create_subscription(Imu, "/imu", self.listener_callback, qos_profile_keeplast)
+        # fmt: on
 
-        self.odom_publisher = self.create_publisher(Odometry, "/odometry/filtered", qos_profile_keeplast)
-        self.tf_broadcaster = TransformBroadcaster(self)
-        self.transform_msg = TransformStamped()
-        self.odom_msg = Odometry()
+        self.base_frame = self.get_parameter("base_frame").value
+        self.odom_frame = self.get_parameter("odom_frame").value
+        self.dt = 1.0 / self.get_parameter("robot_freq").value
 
+        # Load robot model
+        self.robot = loadGo2()
         self.foot_frame_name = [prefix + "_foot" for prefix in ["FL", "FR", "RL", "RR"]]
-        self.foot_frame_ids = [0, 1, 2, 3]
+        self.foot_frame_id = [self.robot.model.getFrameId(frame_name) for frame_name in self.foot_frame_name]
+        self.imu_frame_id = self.robot.model.getFrameId("imu")
 
-        # Filter and global variables ==========================================
-        self.DT_MIN = 1e-6
-        self.DT_MAX = 1
-        self.dt = 0
-
-        # Data from go2 ========================================================
-        self.imu_measurement = np.zeros(6)
-        self.imu_measurement_prev = np.zeros(6)
-        self.quaternion_measurement = np.zeros(4)
-        self.feet_contacts = np.zeros(4)
-        self.contacts = {0: False, 1: False, 2: False, 3: False}
-
-        self.joints_unitree_2_urdf = [1, 0, 3, 2]  # index = urdf convention, value = unitree joint numbering
-
-        self.estimated_contact_positions = {
-            0: 0,  #! not sure if correct
-            1: 0,
-            2: 0,
-            3: 0,
-        }
-
-        # double = float in python
-        self.t: float = 0
-        self.t_prev: float = 0
+        # In/Out topics
+        self.lowstate_subscription = self.create_subscription(LowState, "/lowstate", self.listener_callback, 10)
+        self.odom_publisher = self.create_publisher(Odometry, "/odometry/filtered", 1)
+        self.tf_broadcaster = TransformBroadcaster(self)
 
         # Invariant EKF
-        initial_state = RobotState()
-
-        R0 = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])  # Initial rotation
-
-        v0 = np.zeros(3)  # initial velocity
-        p0 = np.array([0, 0, 0.07])  # initial position in simulation
-        bg0 = np.zeros(3)  # initial gyroscope bias
-        ba0 = np.zeros(3)  # initial accelerometer bias
         gravity = np.array([0, 0, -9.81])
 
-        initial_state.setRotation(R0)
-        initial_state.setVelocity(v0)
-        initial_state.setPosition(p0)
-        initial_state.setGyroscopeBias(bg0)
-        initial_state.setAccelerometerBias(ba0)
+        initial_state = RobotState()
+        initial_state.setRotation(np.eye(3))
+        initial_state.setVelocity(np.zeros(3))
+        initial_state.setPosition(np.zeros(3))
+        initial_state.setGyroscopeBias(np.zeros(3))
+        initial_state.setAccelerometerBias(np.zeros(3))
 
         # Initialize state covariance
         noise_params = NoiseParams()
-        noise_params.setGyroscopeNoise(0.01)
-        noise_params.setAccelerometerNoise(0.1)
-        noise_params.setGyroscopeBiasNoise(0.00001)
-        noise_params.setAccelerometerBiasNoise(0.0001)
-        noise_params.setContactNoise(0.001)
+        noise_params.setGyroscopeNoise(self.get_parameter("gyroscope_noise").value)
+        noise_params.setAccelerometerNoise(self.get_parameter("accelerometer_noise").value)
+        noise_params.setGyroscopeBiasNoise(self.get_parameter("gyroscopeBias_noise").value)
+        noise_params.setAccelerometerBiasNoise(self.get_parameter("accelerometerBias_noise").value)
+        noise_params.setContactNoise(self.get_parameter("contact_noise").value)
+
+        self.joint_pos_noise = self.get_parameter("joint_position_noise").value
+        self.contact_vel_noise = self.get_parameter("contact_velocity_noise").value
 
         self.filter = InEKF(initial_state, noise_params)
         self.filter.setGravity(gravity)
 
-    def listener_feet_callback(self, state_msg):
-        self.t = state_msg.header.stamp.sec + state_msg.header.stamp.nanosec * 1e-9
+    def listener_callback(self, msg):
+        # Format IMU measurements
+        imu_state = np.concatenate([msg.imu_state.gyroscope, msg.imu_state.accelerometer])
 
-        pose_vec = state_msg.pose_vec
-        contact_states = state_msg.contact_states
-        # self.get_logger().info('Feet in contact ' + str(state_msg.feet_names))
+        # Propagate filter
+        self.filter.propagate(imu_state, self.dt)
 
-        contact_list = []
+        # TODO: use IMU quaternion for extra correction step ?
+
+        # FEET KINEMATIC data ==================================================
+        contact_list, pose_list, normed_covariance_list = self.feet_transformations(msg)
+
+        contact_pairs = []
         kinematics_list = []
-
         for i in range(len(self.foot_frame_name)):
-            contact_list.append((i, contact_states[i]))
-            pose = pose_vec[i]
-
-            quat = pin.Quaternion(
-                pose.pose.orientation.w, pose.pose.orientation.x, pose.pose.orientation.y, pose.pose.orientation.z
-            )
-            quat.normalize()
-
-            translation = np.zeros(3)
-            translation[0] = pose.pose.position.x
-            translation[1] = pose.pose.position.y
-            translation[2] = pose.pose.position.z
-
-            contact_cov = pose.covariance[:9]
-            contact_cov = np.squeeze(contact_cov)
-            contact_cov = contact_cov.reshape(3, 3)
+            contact_pairs.append((i, contact_list[i]))
 
             velocity = np.zeros(3)
 
-            kinematics = Kinematics(i, translation, contact_cov, velocity, np.eye(3) * 0.001)
+            kinematics = Kinematics(
+                i,
+                pose_list[i].translation,
+                self.joint_pos_noise * normed_covariance_list[i],
+                velocity,
+                self.contact_vel_noise * np.eye(3),
+            )
             kinematics_list.append(kinematics)
 
-            # self.get_logger().info('Base contact of ' + self.foot_frame_name[i] + ' is ' + str(pose_matrix[:3,3]))
-            # self.get_logger().info('Rotation of ' + self.foot_frame_name[i] + ' is ' + str(pose_matrix[:3,:3]))
-
-        # self.get_logger().info('Contact list' + str(contact_list))
-        self.filter.setContacts(contact_list)
+        self.filter.setContacts(contact_pairs)
         self.filter.correctKinematics(kinematics_list)
 
-    def listener_callback(self, state_msg):
-        # TODO verify if timestamp can be used as time
-        self.t = state_msg.header.stamp.sec + state_msg.header.stamp.nanosec * 1e-9
-        self.dt = self.t - self.t_prev
+        self.publish_state(self.filter.getState(), msg.imu_state.gyroscope)
 
-        # IMU measurement - used for propagation ===============================
-        #! gyroscope meas in filter are radians
-        self.imu_measurement[0] = state_msg.angular_velocity.x
-        self.imu_measurement[1] = state_msg.angular_velocity.y
-        self.imu_measurement[2] = state_msg.angular_velocity.z
+    def _unitree_to_urdf_vec(self, vec):
+        # fmt: off
+        return  [vec[3],  vec[4],  vec[5],
+                 vec[0],  vec[1],  vec[2],
+                 vec[9],  vec[10], vec[11],
+                 vec[6],  vec[7],  vec[8],]
+        # fmt: on
 
-        self.imu_measurement[3] = state_msg.linear_acceleration.x
-        self.imu_measurement[4] = state_msg.linear_acceleration.y
-        self.imu_measurement[5] = state_msg.linear_acceleration.z
+    def feet_transformations(self, state_msg):
+        # Get sensor measurement
+        q_unitree = [j.q for j in state_msg.motor_state[:12]]
+        v_unitree = [j.dq for j in state_msg.motor_state[:12]]
+        f_unitree = state_msg.foot_force
 
-        # breakpoint()
-        if self.dt > self.DT_MIN and self.dt < self.DT_MAX:
-            # propagate using previous measurement
-            self.propagate()
+        # Rearrange joints according to urdf
+        q_pin = np.array([0] * 6 + [1] + self._unitree_to_urdf_vec(q_unitree))
+        v_pin = np.array([0] * 6 + self._unitree_to_urdf_vec(v_unitree))
+        f_pin = [f_unitree[i] for i in [1, 0, 3, 2]]
 
-        # KINEMATIC data =======================================================
-        self.quaternion_measurement[0] = state_msg.orientation.x
-        self.quaternion_measurement[1] = state_msg.orientation.y
-        self.quaternion_measurement[2] = state_msg.orientation.z
-        self.quaternion_measurement[3] = state_msg.orientation.w
-        # TODO normalize quaternion && find quat type
+        # Compute positions and velocities
+        pin.forwardKinematics(self.robot.model, self.robot.data, q_pin, v_pin)
+        pin.updateFramePlacements(self.robot.model, self.robot.data)
+        pin.computeJointJacobians(self.robot.model, self.robot.data)
 
-        # TODO: add feet vel and feet pos (additionnal info on base)
-        self.t_prev = self.t
-        self.imu_measurement_prev = self.imu_measurement
+        # Make message
+        contact_list = []
+        pose_list = []
+        normed_covariance_list = []
+        for i in range(4):
+            if f_pin[i] >= 20:
+                contact_list.append(True)
+            else:
+                contact_list.append(False)
 
-    def propagate(self):
-        # Transform from odom_frame (unmoving) to base_frame (tied to robot base)
+            pose_list.append(self.robot.data.oMf[self.foot_frame_id[i]])
+
+            Jc = pin.getFrameJacobian(self.robot.model, self.robot.data, self.foot_frame_id[i], pin.LOCAL)[:3, 6:]
+            normed_cov_pose = Jc @ Jc.transpose()
+            normed_covariance_list.append(normed_cov_pose)
+
+        return contact_list, pose_list, normed_covariance_list
+
+    def publish_state(self, filter_state, twist_angular_vel):
+        # Get filter state
         timestamp = self.get_clock().now().to_msg()
-        self.transform_msg.header.stamp = timestamp
-        self.transform_msg.child_frame_id = "base"  # self.get_parameter("base_frame").value
-        self.transform_msg.header.frame_id = "odom"  # self.get_parameter("odom_frame").value
 
-        self.odom_msg.header.stamp = timestamp
-        self.odom_msg.child_frame_id = "base"  # self.get_parameter("base_frame").value
-        self.odom_msg.header.frame_id = "odom"  # self.get_parameter("odom_frame").value
+        state_rotation = filter_state.getRotation()
+        state_position = filter_state.getPosition()
+        state_velocity = state_rotation.T @ filter_state.getX()[0:3, 3:4]
+        state_velocity = state_velocity.reshape(-1)
 
-        self.filter.propagate(self.imu_measurement_prev, self.dt)
+        state_quaternion = pin.Quaternion(state_rotation)
+        state_quaternion.normalize()
 
-        new_state = self.filter.getState()
-        new_r = new_state.getRotation()
-        new_p = new_state.getPosition()
-        new_v = new_r.T @ new_state.getX()[0:3, 3:4]
-        new_v = new_v.reshape(-1)
-        # self.get_logger().info('imu measure ' + str(self.imu_measurement_prev))
-        # self.get_logger().info('Position ' + str(new_p))
+        # TF2 messages
+        transform_msg = TransformStamped()
+        transform_msg.header.stamp = timestamp
+        transform_msg.child_frame_id = self.base_frame
+        transform_msg.header.frame_id = self.odom_frame
 
-        quat = pin.Quaternion(new_r)
-        quat.normalize()
+        transform_msg.transform.translation.x = state_position[0]
+        transform_msg.transform.translation.y = state_position[1]
+        transform_msg.transform.translation.z = state_position[2]
 
-        # ROS2 transform
-        self.transform_msg.transform.translation.x = new_p[0]
-        self.transform_msg.transform.translation.y = new_p[1]
-        self.transform_msg.transform.translation.z = new_p[2]
+        transform_msg.transform.rotation.x = state_quaternion.x
+        transform_msg.transform.rotation.y = state_quaternion.y
+        transform_msg.transform.rotation.z = state_quaternion.z
+        transform_msg.transform.rotation.w = state_quaternion.w
 
-        self.odom_msg.pose.pose.position.x = new_p[0]
-        self.odom_msg.pose.pose.position.y = new_p[1]
-        self.odom_msg.pose.pose.position.z = new_p[2]
+        self.tf_broadcaster.sendTransform(transform_msg)
 
-        self.transform_msg.transform.rotation.x = quat.x
-        self.transform_msg.transform.rotation.y = quat.y
-        self.transform_msg.transform.rotation.z = quat.z
-        self.transform_msg.transform.rotation.w = quat.w
+        # Odometry topic
+        odom_msg = Odometry()
+        odom_msg.header.stamp = timestamp
+        odom_msg.child_frame_id = self.base_frame
+        odom_msg.header.frame_id = self.odom_frame
 
-        self.odom_msg.pose.pose.orientation.x = quat.x
-        self.odom_msg.pose.pose.orientation.y = quat.y
-        self.odom_msg.pose.pose.orientation.z = quat.z
-        self.odom_msg.pose.pose.orientation.w = quat.w
+        odom_msg.pose.pose.position.x = state_position[0]
+        odom_msg.pose.pose.position.y = state_position[1]
+        odom_msg.pose.pose.position.z = state_position[2]
 
-        self.odom_msg.twist.twist.linear.x = new_v[0]
-        self.odom_msg.twist.twist.linear.y = new_v[1]
-        self.odom_msg.twist.twist.linear.z = new_v[2]
+        odom_msg.pose.pose.orientation.x = state_quaternion.x
+        odom_msg.pose.pose.orientation.y = state_quaternion.y
+        odom_msg.pose.pose.orientation.z = state_quaternion.z
+        odom_msg.pose.pose.orientation.w = state_quaternion.w
 
-        self.odom_msg.twist.twist.angular.x = self.imu_measurement_prev[0]
-        self.odom_msg.twist.twist.angular.y = self.imu_measurement_prev[1]
-        self.odom_msg.twist.twist.angular.z = self.imu_measurement_prev[2]
+        odom_msg.twist.twist.linear.x = state_velocity[0]
+        odom_msg.twist.twist.linear.y = state_velocity[1]
+        odom_msg.twist.twist.linear.z = state_velocity[2]
 
-        self.tf_broadcaster.sendTransform(self.transform_msg)
-        self.odom_publisher.publish(self.odom_msg)
+        odom_msg.twist.twist.angular.x = float(twist_angular_vel[0])
+        odom_msg.twist.twist.angular.y = float(twist_angular_vel[1])
+        odom_msg.twist.twist.angular.z = float(twist_angular_vel[2])
 
-    # Attributes ===============================================================
-
-    estimated_landmarks = {}  # int:int
-    contacts = {}  # int:bool
-    estimated_contact_positions = {}  # int:int
+        self.odom_publisher.publish(odom_msg)
 
 
 def main(args=None):
@@ -233,9 +218,6 @@ def main(args=None):
 
     rclpy.spin(inekf_node)
 
-    # Destroy the node explicitly
-    # (optional - otherwise it will be done automatically
-    # when the garbage collector destroys the node object)
     inekf_node.destroy_node()
     rclpy.shutdown()
 
