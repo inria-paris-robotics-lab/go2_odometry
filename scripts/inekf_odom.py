@@ -64,7 +64,8 @@ class Inekf(Node):
         initial_state = RobotState()
         initial_state.setRotation(np.eye(3))
         initial_state.setVelocity(np.zeros(3))
-        initial_state.setPosition(np.zeros(3))
+        # initial_state.setPosition(np.zeros(3))
+        initial_state.setPosition(np.array([0.064, 0.0, 0.3085]))
         initial_state.setGyroscopeBias(np.zeros(3))
         initial_state.setAccelerometerBias(np.zeros(3))
 
