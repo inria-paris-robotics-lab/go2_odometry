@@ -38,6 +38,7 @@ class Inekf(Node):
                 ("contact_noise", 0.001, PD(description="Inekf covariance value")),
                 ("joint_position_noise", 0.001, PD(description="Noise on joint configuration measurements to project using jacobian")),
                 ("contact_velocity_noise", 0.001, PD(description="Noise on contact velocity")),
+                ("enforce_flat_ground", True, PD(description="Force contacting feet to z=0 for flat ground operation")),
             ],
         )
         # fmt: on
@@ -79,6 +80,7 @@ class Inekf(Node):
 
         self.joint_pos_noise = self.get_parameter("joint_position_noise").value
         self.contact_vel_noise = self.get_parameter("contact_velocity_noise").value
+        self.enforce_flat_ground = self.get_parameter("enforce_flat_ground").value
 
         self.filter = InEKF(initial_state, noise_params)
         self.filter.setGravity(gravity)
@@ -111,9 +113,19 @@ class Inekf(Node):
 
             velocity = np.zeros(3)
 
+            # Get foot position from kinematics (in base frame)
+            foot_position = pose_list[i].translation.copy()
+            
+            if self.enforce_flat_ground and contact_list[i]:
+               current_base_z = self.filter.getState().getPosition()[2]
+               # To have foot at z_world=0, the foot's z in base frame should be -base_z
+               previous_foot_z = foot_position[2].copy()
+               foot_position[2] = -current_base_z
+               self.get_logger().info(f"Foot {i} in contact: enforcing z_world=0 (base_z={current_base_z:.4f}, previous_foot_z={previous_foot_z:.4f})")
+
             kinematics = Kinematics(
                 i,
-                pose_list[i].translation,
+                foot_position,
                 self.joint_pos_noise * normed_covariance_list[i],
                 velocity,
                 self.contact_vel_noise * np.eye(3),
