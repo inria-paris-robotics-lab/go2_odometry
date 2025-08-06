@@ -33,7 +33,7 @@ def generate_launch_description():
     )
     mocap_ip_arg = DeclareLaunchArgument(
         "qualisys_ip",
-        default_value="128.93.64.222",
+        default_value="192.168.75.4",
         description="[IF MOCAP] IP used by the motion capture to publish data.",
     )
     mocap_publishing_freq_arg = DeclareLaunchArgument(

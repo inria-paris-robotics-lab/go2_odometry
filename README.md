@@ -82,7 +82,7 @@ Ros parameters :
 - `base_frame` (default: 'base') : name of the robot base frame
 - `odom_frame` (default: 'odom') : name of the fixed frame
 - `wanted_body` (default: 'Go2') : name of the object to be tracked in the motion capture software
-- `qualisys_ip` (default: 192.168.75.2) : IP used to communicate with the motion capture software
+- `qualisys_ip` (default: 192.168.75.4) : IP used to communicate with the motion capture software
 - `publishing_freq` (default: 110) : publishing frequency of the transform & odometry topics
 - `mimic_go2_odometry` (default: 1) : defines the dehavior of the mocap node
 
