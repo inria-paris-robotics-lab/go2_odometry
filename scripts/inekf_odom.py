@@ -154,6 +154,7 @@ class Inekf(Node):
         # Unitree configuration
         q, v, _ = Inekf.get_qvf_pinocchio(state_msg)
 
+        # Use robot IMU guess to initialize the filter
         q[3] = state_msg.imu_state.quaternion[1]
         q[4] = state_msg.imu_state.quaternion[2]
         q[5] = state_msg.imu_state.quaternion[3]
@@ -161,18 +162,29 @@ class Inekf(Node):
 
         q[3:7] /= np.linalg.norm(q[3:7])  # Normalize quaternion
 
-        # Compute positions and velocities
+        # Computer FK
         pin.forwardKinematics(self.robot.model, self.robot.data, q, v)
         pin.updateFramePlacements(self.robot.model, self.robot.data)
 
-        oMi = self.robot.data.oMf[self.imu_frame_id]
-        rpy = pin.rpy.matrixToRpy(oMi.rotation)
+        # Compute filter rotation
+        oMimu = self.robot.data.oMf[self.imu_frame_id]
+        rpy = pin.rpy.matrixToRpy(oMimu.rotation)
         rpy[2] = 0  # Robot always facing x=0 at start
         imu_rotation = pin.rpy.rpyToMatrix(rpy)
+
+        # Compute filter position
+        z_avg = 0
+        for i in range(4):
+            oMfoot = self.robot.data.oMf[self.foot_frame_id[i]]
+            footMimu = oMfoot.actInv(oMimu)
+            z_avg += footMimu.translation[2]
+        z_avg /= 4.0
+        imu_position = np.array([0.0, 0.0, z_avg])
 
         # Filter state
         state = self.filter.getState()
         state.setRotation(imu_rotation)
+        state.setPosition(imu_position)
         self.filter.setState(state)
 
     def feet_transformations(self, state_msg):
