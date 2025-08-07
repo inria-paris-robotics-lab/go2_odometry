@@ -4,6 +4,7 @@ import numpy as np
 
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import QoSProfile, QoSHistoryPolicy
 
 from nav_msgs.msg import Odometry
 from unitree_go.msg import LowState
@@ -52,9 +53,12 @@ class Inekf(Node):
         self.foot_frame_name = [prefix + "_foot" for prefix in ["FL", "FR", "RL", "RR"]]
         self.foot_frame_id = [self.robot.model.getFrameId(frame_name) for frame_name in self.foot_frame_name]
         self.imu_frame_id = self.robot.model.getFrameId("imu")
+        self.base_frame_id = self.robot.model.getFrameId(self.base_frame)
 
         # In/Out topics
-        self.lowstate_subscription = self.create_subscription(LowState, "/lowstate", self.listener_callback, 10)
+        self.lowstate_subscription = self.create_subscription(
+            LowState, "/lowstate", self.listener_callback, QoSProfile(history=QoSHistoryPolicy.KEEP_LAST, depth=10)
+        )
         self.odom_publisher = self.create_publisher(Odometry, "/odometry/filtered", 1)
         self.tf_broadcaster = TransformBroadcaster(self)
 
