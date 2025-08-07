@@ -1,4 +1,4 @@
-#!/bin/env python3
+#!/usr/bin/env python3
 """
 Gives odometry of the robot_base based on motion capture readings
 Motion capture : Qualisys with RealTime protocol version 1.24
