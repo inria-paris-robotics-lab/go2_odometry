@@ -90,11 +90,11 @@ class Inekf(Node):
         contact_list, pose_list, normed_covariance_list = self.feet_transformations(msg)
 
         if self.pause:
-            if any(contact_list):
+            if all(contact_list):
                 self.pause = False
-                self.get_logger().info("One foot (or more) in contact with the ground: starting filter.")
+                self.get_logger().info("All feet in contact with the ground: starting filter.")
             else:
-                self.get_logger().info("Waiting for one or more foot to touch the ground to start filter.", once=True)
+                self.get_logger().info("Waiting for all feet to touch the ground to start filter.", once=True)
                 return  # Skip the rest of the filter
 
         # Propagation step: using IMU
