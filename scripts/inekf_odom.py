@@ -96,6 +96,7 @@ class Inekf(Node):
         if self.pause:
             if all(contact_list):
                 self.pause = False
+                self.initialize_filter(msg)
                 self.get_logger().info("All feet in contact with the ground: starting filter.")
             else:
                 self.get_logger().info("Waiting for all feet to touch the ground to start filter.", once=True)
@@ -148,6 +149,31 @@ class Inekf(Node):
         f_pin = [f_unitree[i] for i in [1, 0, 3, 2]]
 
         return q_pin, v_pin, f_pin
+
+    def initialize_filter(self, state_msg):
+        # Unitree configuration
+        q, v, _ = Inekf.get_qvf_pinocchio(state_msg)
+
+        q[3] = state_msg.imu_state.quaternion[1]
+        q[4] = state_msg.imu_state.quaternion[2]
+        q[5] = state_msg.imu_state.quaternion[3]
+        q[6] = state_msg.imu_state.quaternion[0]
+
+        q[3:7] /= np.linalg.norm(q[3:7])  # Normalize quaternion
+
+        # Compute positions and velocities
+        pin.forwardKinematics(self.robot.model, self.robot.data, q, v)
+        pin.updateFramePlacements(self.robot.model, self.robot.data)
+
+        oMi = self.robot.data.oMf[self.imu_frame_id]
+        rpy = pin.rpy.matrixToRpy(oMi.rotation)
+        rpy[2] = 0  # Robot always facing x=0 at start
+        imu_rotation = pin.rpy.rpyToMatrix(rpy)
+
+        # Filter state
+        state = self.filter.getState()
+        state.setRotation(imu_rotation)
+        self.filter.setState(state)
 
     def feet_transformations(self, state_msg):
         def feet_contacts(feet_forces):
