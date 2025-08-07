@@ -192,7 +192,7 @@ class Inekf(Node):
         pose_list = []
         normed_covariance_list = []
         for i in range(4):
-            pose_list.append(self.robot.data.oMf[self.foot_frame_id[i]])
+            pose_list.append(self.robot.data.oMf[self.foot_frame_id[i]].copy())
 
             Jc = pin.getFrameJacobian(self.robot.model, self.robot.data, self.foot_frame_id[i], pin.LOCAL)[:3, 6:]
             normed_cov_pose = Jc @ Jc.transpose()
