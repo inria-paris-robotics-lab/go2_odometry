@@ -124,7 +124,7 @@ class Inekf(Node):
 
         self.publish_state(self.filter.getState(), msg.imu_state.gyroscope)
 
-    def feet_transformations(self, state_msg):
+    def get_qvf_pinocchio(state_msg):
         def unitree_to_urdf_vec(vec):
             # fmt: off
             return  [vec[3],  vec[4],  vec[5],
@@ -132,9 +132,6 @@ class Inekf(Node):
                      vec[9],  vec[10], vec[11],
                      vec[6],  vec[7],  vec[8],]
             # fmt: on
-
-        def feet_contacts(feet_forces):
-            return [bool(f >= 20) for f in feet_forces]
 
         # Get sensor measurement
         q_unitree = [j.q for j in state_msg.motor_state[:12]]
@@ -145,6 +142,15 @@ class Inekf(Node):
         q_pin = np.array([0] * 6 + [1] + unitree_to_urdf_vec(q_unitree))
         v_pin = np.array([0] * 6 + unitree_to_urdf_vec(v_unitree))
         f_pin = [f_unitree[i] for i in [1, 0, 3, 2]]
+
+        return q_pin, v_pin, f_pin
+
+    def feet_transformations(self, state_msg):
+        def feet_contacts(feet_forces):
+            return [bool(f >= 20) for f in feet_forces]
+
+        # Get configuration
+        q_pin, v_pin, f_pin = Inekf.get_qvf_pinocchio(state_msg)
 
         # Compute positions and velocities
         pin.forwardKinematics(self.robot.model, self.robot.data, q_pin, v_pin)
