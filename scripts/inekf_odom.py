@@ -179,7 +179,7 @@ class Inekf(Node):
             footMimu = oMfoot.actInv(oMimu)
             z_avg += footMimu.translation[2]
         z_avg /= 4.0
-        imu_position = np.array([0.0, 0.0, z_avg])
+        imu_position = np.array([0.0, 0.0, z_avg + 0.025])  # Add foot thickness of 2.5 cm
 
         # Filter state
         state = self.filter.getState()
