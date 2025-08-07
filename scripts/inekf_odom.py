@@ -38,7 +38,7 @@ class Inekf(Node):
                 ("contact_noise", 0.001, PD(description="Inekf covariance value")),
                 ("joint_position_noise", 0.001, PD(description="Noise on joint configuration measurements to project using jacobian")),
                 ("contact_velocity_noise", 0.001, PD(description="Noise on contact velocity")),
-                ("enforce_flat_ground", True, PD(description="Force contacting feet to z=0 for flat ground operation")),
+                ("enforce_flat_ground", False, PD(description="Force contacting feet to z=0 for flat ground operation")),
             ],
         )
         # fmt: on
@@ -115,13 +115,22 @@ class Inekf(Node):
 
             # Get foot position from kinematics (in base frame)
             foot_position = pose_list[i].translation.copy()
-            
+
             if self.enforce_flat_ground and contact_list[i]:
-               current_base_z = self.filter.getState().getPosition()[2]
-               # To have foot at z_world=0, the foot's z in base frame should be -base_z
-               previous_foot_z = foot_position[2].copy()
-               foot_position[2] = -current_base_z
-               self.get_logger().info(f"Foot {i} in contact: enforcing z_world=0 (base_z={current_base_z:.4f}, previous_foot_z={previous_foot_z:.4f})")
+               # foot_position_previous = foot_position.copy()
+            #    print(f"{self.filter.getState()=}")
+            #    print(f"{self.filter.getState().getPosition()=}")
+
+               current_base_position = self.filter.getState().getPosition()
+               current_base_rotation = self.filter.getState().getRotation()
+               base_se3 = pin.SE3(rotation=current_base_rotation, translation=current_base_position)
+
+               foot_in_world = base_se3.act(foot_position)
+            #    foot_in_world = foot_position
+               foot_in_world_prev = foot_in_world.copy()
+               foot_in_world[2] = 0.0
+               foot_position = base_se3.actInv(foot_in_world)
+               self.get_logger().info(f"Foot {i} in contact: {current_base_position=}\n{foot_in_world_prev=}\n{foot_position=}\n\n")
 
             kinematics = Kinematics(
                 i,
