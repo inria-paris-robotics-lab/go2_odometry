@@ -3,6 +3,7 @@
 import numpy as np
 
 import rclpy
+import pinocchio as pin
 from rclpy.node import Node
 
 from nav_msgs.msg import Odometry
@@ -28,7 +29,7 @@ class Inekf(Node):
         self.declare_parameters(
             namespace="",
             parameters=[
-                ("base_frame", "base", PD(description="Robot base frame name (for TF)")),
+                ("base_frame", "base_inekf", PD(description="Robot base frame name (for TF)")),
                 ("odom_frame", "odom", PD(description="World frame name (for TF)")),
                 ("robot_freq", 500.0, PD(description="Frequency at which the robot publish its state")),
                 ("gyroscope_noise", 0.01, PD(description="Inekf covariance value")),
@@ -56,7 +57,7 @@ class Inekf(Node):
 
         # In/Out topics
         self.lowstate_subscription = self.create_subscription(LowState, "/lowstate", self.listener_callback, 10)
-        self.odom_publisher = self.create_publisher(Odometry, "/odometry/filtered", 1)
+        self.odom_publisher = self.create_publisher(Odometry, "/odometry/inekf/filtered", 1)
         self.tf_broadcaster = TransformBroadcaster(self)
 
         # Invariant EKF
