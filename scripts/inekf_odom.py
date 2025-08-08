@@ -162,7 +162,7 @@ class Inekf(Node):
 
         q[3:7] /= np.linalg.norm(q[3:7])  # Normalize quaternion
 
-        # Computer FK
+        # Compute FK
         pin.forwardKinematics(self.robot.model, self.robot.data, q, v)
         pin.updateFramePlacements(self.robot.model, self.robot.data)
 
