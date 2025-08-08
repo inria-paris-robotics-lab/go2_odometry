@@ -53,7 +53,16 @@ class Inekf(Node):
         self.foot_frame_name = [prefix + "_foot" for prefix in ["FL", "FR", "RL", "RR"]]
         self.foot_frame_id = [self.robot.model.getFrameId(frame_name) for frame_name in self.foot_frame_name]
         self.imu_frame_id = self.robot.model.getFrameId("imu")
+        assert self.imu_frame_id < len(self.robot.model.frames)
         self.base_frame_id = self.robot.model.getFrameId(self.base_frame)
+        assert self.base_frame_id < len(self.robot.model.frames)
+
+        # Save rigid transform between imu (filter frame) and base (output frame)
+        pin.forwardKinematics(self.robot.model, self.robot.data, pin.neutral(self.robot.model))
+        pin.updateFramePlacements(self.robot.model, self.robot.data)
+        oMimu = self.robot.data.oMf[self.imu_frame_id]
+        oMbase = self.robot.data.oMf[self.base_frame_id]
+        self.imuMbase = oMimu.actInv(oMbase)
 
         # In/Out topics
         self.lowstate_subscription = self.create_subscription(
@@ -199,12 +208,15 @@ class Inekf(Node):
         pin.updateFramePlacements(self.robot.model, self.robot.data)
         pin.computeJointJacobians(self.robot.model, self.robot.data)
 
-        # Make message
+        # Compute foot kinematics adn jacobian
+        oMimu = self.robot.data.oMf[self.imu_frame_id]
         contact_list = feet_contacts(f_pin)
         pose_list = []
         normed_covariance_list = []
         for i in range(4):
-            pose_list.append(self.robot.data.oMf[self.foot_frame_id[i]].copy())
+            oMfoot = self.robot.data.oMf[self.foot_frame_id[i]]
+            imuMfoot = oMimu.actInv(oMfoot)
+            pose_list.append(imuMfoot)
 
             Jc = pin.getFrameJacobian(self.robot.model, self.robot.data, self.foot_frame_id[i], pin.LOCAL)[:3, 6:]
             normed_cov_pose = Jc @ Jc.transpose()
@@ -216,13 +228,19 @@ class Inekf(Node):
         # Get filter state
         timestamp = self.get_clock().now().to_msg()
 
-        state_rotation = filter_state.getRotation()
-        state_position = filter_state.getPosition()
-        state_velocity = state_rotation.T @ filter_state.getX()[0:3, 3:4]
-        state_velocity = state_velocity.reshape(-1)
+        # Get filter state (imu frame)
+        oMimu = pin.SE3(filter_state.getRotation(), filter_state.getPosition())
+        v_linear_imu_world = filter_state.getX()[0:3, 3].reshape(-1)
+        v_linear_imu_local = oMimu.inverse().rotation @ v_linear_imu_world
+        v_imu_local = pin.Motion(linear=v_linear_imu_local, angular=twist_angular_vel)
 
-        state_quaternion = pin.Quaternion(state_rotation)
-        state_quaternion.normalize()
+        # Transform to base frame
+        base_pose = oMimu.act(self.imuMbase)
+        base_velocity = self.imuMbase.act(v_imu_local)
+
+        # Convert to quaternion
+        base_quaternion = pin.Quaternion(base_pose.rotation)
+        base_quaternion.normalize()
 
         # TF2 messages
         transform_msg = TransformStamped()
@@ -230,14 +248,14 @@ class Inekf(Node):
         transform_msg.child_frame_id = self.base_frame
         transform_msg.header.frame_id = self.odom_frame
 
-        transform_msg.transform.translation.x = state_position[0]
-        transform_msg.transform.translation.y = state_position[1]
-        transform_msg.transform.translation.z = state_position[2]
+        transform_msg.transform.translation.x = float(base_pose.translation[0])
+        transform_msg.transform.translation.y = float(base_pose.translation[1])
+        transform_msg.transform.translation.z = float(base_pose.translation[2])
 
-        transform_msg.transform.rotation.x = state_quaternion.x
-        transform_msg.transform.rotation.y = state_quaternion.y
-        transform_msg.transform.rotation.z = state_quaternion.z
-        transform_msg.transform.rotation.w = state_quaternion.w
+        transform_msg.transform.rotation.x = base_quaternion.x
+        transform_msg.transform.rotation.y = base_quaternion.y
+        transform_msg.transform.rotation.z = base_quaternion.z
+        transform_msg.transform.rotation.w = base_quaternion.w
 
         self.tf_broadcaster.sendTransform(transform_msg)
 
@@ -247,22 +265,22 @@ class Inekf(Node):
         odom_msg.child_frame_id = self.base_frame
         odom_msg.header.frame_id = self.odom_frame
 
-        odom_msg.pose.pose.position.x = state_position[0]
-        odom_msg.pose.pose.position.y = state_position[1]
-        odom_msg.pose.pose.position.z = state_position[2]
+        odom_msg.pose.pose.position.x = float(base_pose.translation[0])
+        odom_msg.pose.pose.position.y = float(base_pose.translation[1])
+        odom_msg.pose.pose.position.z = float(base_pose.translation[2])
 
-        odom_msg.pose.pose.orientation.x = state_quaternion.x
-        odom_msg.pose.pose.orientation.y = state_quaternion.y
-        odom_msg.pose.pose.orientation.z = state_quaternion.z
-        odom_msg.pose.pose.orientation.w = state_quaternion.w
+        odom_msg.pose.pose.orientation.x = base_quaternion.x
+        odom_msg.pose.pose.orientation.y = base_quaternion.y
+        odom_msg.pose.pose.orientation.z = base_quaternion.z
+        odom_msg.pose.pose.orientation.w = base_quaternion.w
 
-        odom_msg.twist.twist.linear.x = state_velocity[0]
-        odom_msg.twist.twist.linear.y = state_velocity[1]
-        odom_msg.twist.twist.linear.z = state_velocity[2]
+        odom_msg.twist.twist.linear.x = float(base_velocity.linear[0])
+        odom_msg.twist.twist.linear.y = float(base_velocity.linear[1])
+        odom_msg.twist.twist.linear.z = float(base_velocity.linear[2])
 
-        odom_msg.twist.twist.angular.x = float(twist_angular_vel[0])
-        odom_msg.twist.twist.angular.y = float(twist_angular_vel[1])
-        odom_msg.twist.twist.angular.z = float(twist_angular_vel[2])
+        odom_msg.twist.twist.angular.x = float(base_velocity.angular[0])
+        odom_msg.twist.twist.angular.y = float(base_velocity.angular[1])
+        odom_msg.twist.twist.angular.z = float(base_velocity.angular[2])
 
         self.odom_publisher.publish(odom_msg)
 
