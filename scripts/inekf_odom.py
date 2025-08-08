@@ -4,6 +4,7 @@ import numpy as np
 
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import QoSProfile, QoSHistoryPolicy
 
 from nav_msgs.msg import Odometry
 from unitree_go.msg import LowState
@@ -52,9 +53,12 @@ class Inekf(Node):
         self.foot_frame_name = [prefix + "_foot" for prefix in ["FL", "FR", "RL", "RR"]]
         self.foot_frame_id = [self.robot.model.getFrameId(frame_name) for frame_name in self.foot_frame_name]
         self.imu_frame_id = self.robot.model.getFrameId("imu")
+        self.base_frame_id = self.robot.model.getFrameId(self.base_frame)
 
         # In/Out topics
-        self.lowstate_subscription = self.create_subscription(LowState, "/lowstate", self.listener_callback, 10)
+        self.lowstate_subscription = self.create_subscription(
+            LowState, "/lowstate", self.listener_callback, QoSProfile(history=QoSHistoryPolicy.KEEP_LAST, depth=10)
+        )
         self.odom_publisher = self.create_publisher(Odometry, "/odometry/filtered", 1)
         self.tf_broadcaster = TransformBroadcaster(self)
 
@@ -90,11 +94,12 @@ class Inekf(Node):
         contact_list, pose_list, normed_covariance_list = self.feet_transformations(msg)
 
         if self.pause:
-            if any(contact_list):
+            if all(contact_list):
                 self.pause = False
-                self.get_logger().info("One foot (or more) in contact with the ground: starting filter.")
+                self.initialize_filter(msg)
+                self.get_logger().info("All feet in contact with the ground: starting filter.")
             else:
-                self.get_logger().info("Waiting for one or more foot to touch the ground to start filter.", once=True)
+                self.get_logger().info("Waiting for all feet to touch the ground to start filter.", once=True)
                 return  # Skip the rest of the filter
 
         # Propagation step: using IMU
@@ -124,7 +129,7 @@ class Inekf(Node):
 
         self.publish_state(self.filter.getState(), msg.imu_state.gyroscope)
 
-    def feet_transformations(self, state_msg):
+    def get_qvf_pinocchio(state_msg):
         def unitree_to_urdf_vec(vec):
             # fmt: off
             return  [vec[3],  vec[4],  vec[5],
@@ -132,9 +137,6 @@ class Inekf(Node):
                      vec[9],  vec[10], vec[11],
                      vec[6],  vec[7],  vec[8],]
             # fmt: on
-
-        def feet_contacts(feet_forces):
-            return [bool(f >= 20) for f in feet_forces]
 
         # Get sensor measurement
         q_unitree = [j.q for j in state_msg.motor_state[:12]]
@@ -146,6 +148,52 @@ class Inekf(Node):
         v_pin = np.array([0] * 6 + unitree_to_urdf_vec(v_unitree))
         f_pin = [f_unitree[i] for i in [1, 0, 3, 2]]
 
+        return q_pin, v_pin, f_pin
+
+    def initialize_filter(self, state_msg):
+        # Unitree configuration
+        q, v, _ = Inekf.get_qvf_pinocchio(state_msg)
+
+        # Use robot IMU guess to initialize the filter
+        q[3] = state_msg.imu_state.quaternion[1]
+        q[4] = state_msg.imu_state.quaternion[2]
+        q[5] = state_msg.imu_state.quaternion[3]
+        q[6] = state_msg.imu_state.quaternion[0]
+
+        q[3:7] /= np.linalg.norm(q[3:7])  # Normalize quaternion
+
+        # Compute FK
+        pin.forwardKinematics(self.robot.model, self.robot.data, q, v)
+        pin.updateFramePlacements(self.robot.model, self.robot.data)
+
+        # Compute filter rotation
+        oMimu = self.robot.data.oMf[self.imu_frame_id]
+        rpy = pin.rpy.matrixToRpy(oMimu.rotation)
+        rpy[2] = 0  # Robot always facing x=0 at start
+        imu_rotation = pin.rpy.rpyToMatrix(rpy)
+
+        # Compute filter position
+        z_avg = 0
+        for i in range(4):
+            oMfoot = self.robot.data.oMf[self.foot_frame_id[i]]
+            footMimu = oMfoot.actInv(oMimu)
+            z_avg += footMimu.translation[2]
+        z_avg /= 4.0
+        imu_position = np.array([0.0, 0.0, z_avg + 0.025])  # Add foot thickness of 2.5 cm
+
+        # Filter state
+        state = self.filter.getState()
+        state.setRotation(imu_rotation)
+        state.setPosition(imu_position)
+        self.filter.setState(state)
+
+    def feet_transformations(self, state_msg):
+        def feet_contacts(feet_forces):
+            return [bool(f >= 20) for f in feet_forces]
+
+        # Get configuration
+        q_pin, v_pin, f_pin = Inekf.get_qvf_pinocchio(state_msg)
+
         # Compute positions and velocities
         pin.forwardKinematics(self.robot.model, self.robot.data, q_pin, v_pin)
         pin.updateFramePlacements(self.robot.model, self.robot.data)
@@ -156,7 +204,7 @@ class Inekf(Node):
         pose_list = []
         normed_covariance_list = []
         for i in range(4):
-            pose_list.append(self.robot.data.oMf[self.foot_frame_id[i]])
+            pose_list.append(self.robot.data.oMf[self.foot_frame_id[i]].copy())
 
             Jc = pin.getFrameJacobian(self.robot.model, self.robot.data, self.foot_frame_id[i], pin.LOCAL)[:3, 6:]
             normed_cov_pose = Jc @ Jc.transpose()

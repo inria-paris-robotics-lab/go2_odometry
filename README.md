@@ -22,21 +22,23 @@ The main dependencies of this package are:
 ## Launchfiles
 
 ### go2_odometry_switch.launch.py
-"Main" launch file that takes a `mocap_type` argument to select between odometry sources.
-The choices are : `use_full_odom` (default), `fake`, `mocap`
+"Main" launch file that takes a `odom_type` argument to select between odometry sources.
+The choices are : `use_full_odom` (default), `fake`, `mocap`.
+
+`use_full_odom` (a.k.a the *Inekf filter*) is the **preferred** odom type, the others are mostly here for test and debug purposes.
 
 Command:
 ```bash
 ros2 launch go2_odometry go2_odometry_switch.launch.py odom_type:=<your choice>
 ```
 
-- `mocap_type:=use_full_odom`
+- `odom_type:=use_full_odom`
 Calls the **go2_inekf_odometry.launch.py** launch file.
 
-- `mocap_type:=fake`
+- `odom_type:=fake`
 Calls the **go2_fake_odom.launch.py** file.
 
-- `mocap_type:=mocap`
+- `odom_type:=mocap`
 Calls the **go2_mocap.launch.py** file.
 
 Parameters available depending on the odometry used :
