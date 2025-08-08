@@ -175,25 +175,30 @@ class Inekf(Node):
         pin.forwardKinematics(self.robot.model, self.robot.data, q, v)
         pin.updateFramePlacements(self.robot.model, self.robot.data)
 
-        # Compute filter rotation
-        oMimu = self.robot.data.oMf[self.imu_frame_id]
-        rpy = pin.rpy.matrixToRpy(oMimu.rotation)
-        rpy[2] = 0  # Robot always facing x=0 at start
-        imu_rotation = pin.rpy.rpyToMatrix(rpy)
+        # Correct initial rotation
+        oMbase = self.robot.data.oMf[self.base_frame_id]
+        rpy = pin.rpy.matrixToRpy(oMbase.rotation)
+        rpy[2] = 0  # Set yaw to 0 for robot to always face x axis at start
+        oMbase.rotation = pin.rpy.rpyToMatrix(rpy)
 
-        # Compute filter position
+        # Compute average foot height
         z_avg = 0
         for i in range(4):
             oMfoot = self.robot.data.oMf[self.foot_frame_id[i]]
-            footMimu = oMfoot.actInv(oMimu)
-            z_avg += footMimu.translation[2]
+            z_avg += oMfoot.translation[2]
         z_avg /= 4.0
-        imu_position = np.array([0.0, 0.0, z_avg + 0.025])  # Add foot thickness of 2.5 cm
 
-        # Filter state
+        # Correct base position
+        oMbase.translation[:2] = np.zeros(2)  # centered in XY
+        oMbase.translation[2] -= z_avg - 0.025  # Add foot thickness of 2.5 cm
+
+        # Convert base posse to IMU (since filter state is in IMU frame)
+        oMimu = oMbase.act(self.imuMbase.inverse())
+
+        # Set filter initial state
         state = self.filter.getState()
-        state.setRotation(imu_rotation)
-        state.setPosition(imu_position)
+        state.setRotation(oMimu.rotation)
+        state.setPosition(oMimu.translation)
         self.filter.setState(state)
 
     def feet_transformations(self, state_msg):
