@@ -192,7 +192,7 @@ class Inekf(Node):
         oMbase.translation[:2] = np.zeros(2)  # centered in XY
         oMbase.translation[2] -= z_avg - 0.025  # Add foot thickness of 2.5 cm
 
-        # Convert base posse to IMU (since filter state is in IMU frame)
+        # Convert base pose to IMU (since filter state is in IMU frame)
         oMimu = oMbase.act(self.imuMbase.inverse())
 
         # Set filter initial state
