@@ -1,0 +1,154 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<KinematicModel VERSION="3.2">
+	<Parameters>
+		<Parameter NAME="Go2_Go21_x" VALUE="261.96" PRIOR="261.96" HIDDEN="true" />
+		<Parameter NAME="Go2_Go21_y" VALUE="0.0" PRIOR="0.0" HIDDEN="true" />
+		<Parameter NAME="Go2_Go21_z" VALUE="91.57" PRIOR="91.57" HIDDEN="true" />
+		<Parameter NAME="Go2_Go22_x" VALUE="300.12" PRIOR="300.12" HIDDEN="true" />
+		<Parameter NAME="Go2_Go22_y" VALUE="-51.0" PRIOR="-51.0" HIDDEN="true" />
+		<Parameter NAME="Go2_Go22_z" VALUE="22.35" PRIOR="22.35" HIDDEN="true" />
+		<Parameter NAME="Go2_Go23_x" VALUE="265.0" PRIOR="265.0" HIDDEN="true" />
+		<Parameter NAME="Go2_Go23_y" VALUE="41.74" PRIOR="41.74" HIDDEN="true" />
+		<Parameter NAME="Go2_Go23_z" VALUE="82.31" PRIOR="82.31" HIDDEN="true" />
+		<Parameter NAME="Go2_Go24_x" VALUE="301.12" PRIOR="301.12" HIDDEN="true" />
+		<Parameter NAME="Go2_Go24_y" VALUE="51.0" PRIOR="51.0" HIDDEN="true" />
+		<Parameter NAME="Go2_Go24_z" VALUE="47.35" PRIOR="47.35" HIDDEN="true" />
+		<Parameter NAME="Go2_Go25_x" VALUE="236.12" PRIOR="236.12" HIDDEN="true" />
+		<Parameter NAME="Go2_Go25_y" VALUE="-41.74" PRIOR="-41.74" HIDDEN="true" />
+		<Parameter NAME="Go2_Go25_z" VALUE="82.31" PRIOR="82.31" HIDDEN="true" />
+		<Parameter NAME="Go2_Go26_x" VALUE="276.12" PRIOR="276.12" HIDDEN="true" />
+		<Parameter NAME="Go2_Go26_y" VALUE="-41.74" PRIOR="-41.74" HIDDEN="true" />
+		<Parameter NAME="Go2_Go26_z" VALUE="82.31" PRIOR="82.31" HIDDEN="true" />
+		<Parameter NAME="Go2_Go27_x" VALUE="319.59" PRIOR="319.59" HIDDEN="true" />
+		<Parameter NAME="Go2_Go27_y" VALUE="-38.46" PRIOR="-38.46" HIDDEN="true" />
+		<Parameter NAME="Go2_Go27_z" VALUE="79.04" PRIOR="79.04" HIDDEN="true" />
+		<Parameter NAME="Go2_Go28_x" VALUE="319.59" PRIOR="319.59" HIDDEN="true" />
+		<Parameter NAME="Go2_Go28_y" VALUE="38.46" PRIOR="38.46" HIDDEN="true" />
+		<Parameter NAME="Go2_Go28_z" VALUE="79.04" PRIOR="79.04" HIDDEN="true" />
+		<Parameter NAME="Go2_Go29_x" VALUE="-110.2" PRIOR="-110.2" HIDDEN="true" />
+		<Parameter NAME="Go2_Go29_y" VALUE="71.7" PRIOR="71.7" HIDDEN="true" />
+		<Parameter NAME="Go2_Go29_z" VALUE="77.5" PRIOR="77.5" HIDDEN="true" />
+		<Parameter NAME="Go2_Go210_x" VALUE="-144.053263" PRIOR="-144.053263" HIDDEN="true" />
+		<Parameter NAME="Go2_Go210_y" VALUE="0.0" PRIOR="0.0" HIDDEN="true" />
+		<Parameter NAME="Go2_Go210_z" VALUE="44.566731" PRIOR="44.566731" HIDDEN="true" />
+		<Parameter NAME="Go2_Go211_x" VALUE="-110.2" PRIOR="-110.2" HIDDEN="true" />
+		<Parameter NAME="Go2_Go211_y" VALUE="-71.7" PRIOR="-71.7" HIDDEN="true" />
+		<Parameter NAME="Go2_Go211_z" VALUE="77.5" PRIOR="77.5" HIDDEN="true" />
+	</Parameters>
+	<Skeleton>
+		<Segment NAME="Go2" OPACITY="255" BOUNDS="-50 -50 -50 50 50 50" MASS="0" MASS-CENTRE="0 0 0" INERTIA="0 0 0" RGB="255 164 0" HIDDEN="false" DRAW-END-RATIO="1" DRAW-HEIGHT="0.5" DRAW-TWIST="0" DRAW-WIDTH="0.5" DRAW-STYLE="box" DRAW-SHADING="shaded-smooth">
+			<JointFree NAME="World_Go2" PRE-ORIENTATION="0 0 0" PRE-POSITION="0 0 0" INVERSE-POST-ORIENTATION="0 0 0" INVERSE-POST-POSITION="0 0 0" MEAN="0 0 0 0 0 0" COVARIANCE="2.464900016784668 0 0 0 0 0 0 2.464900016784668 0 0 0 0 0 0 246.49000549316406 0 0 0 0 0 0 1000000 0 0 0 0 0 0 1000000 0 0 0 0 0 0 1000000" T="* * * * * *" SIGNS="+ + + + + +" RANGE-CENTRING-STATE="0 0 0 0 0 0" RANGE-MATRIX="29.60881233215332 0 0 0 0 0 0 29.60881233215332 0 0 0 0 0 0 29.60881233215332 0 0 0 0 0 0 100000000 0 0 0 0 0 0 100000000 0 0 0 0 0 0 100000000">
+				<JointTemplate MEAN="0 0 0 0 0 0" COVARIANCE="2.464900016784668 0 0 0 0 0 0 2.464900016784668 0 0 0 0 0 0 246.49000549316406 0 0 0 0 0 0 1000000 0 0 0 0 0 0 1000000 0 0 0 0 0 0 1000000" TPOSE-MEAN="0 0 0 0 0 0" TPOSE-COVARIANCE="0.10000000149011612 0 0 0 0 0 0 0.10000000149011612 0 0 0 0 0 0 0.10000000149011612 0 0 0 0 0 0 0.10000000149011612 0 0 0 0 0 0 0.10000000149011612 0 0 0 0 0 0 0.10000000149011612" PRE-ORIENTATION="0 0 0" PRE-POSITION="0 0 0" INVERSE-POST-ORIENTATION="0 0 0" INVERSE-POST-POSITION="0 0 0" />
+			</JointFree>
+		</Segment>
+	</Skeleton>
+	<MarkerSet>
+		<Markers>
+			<Marker NAME="Go21" RADIUS="14" RGB="255 164 0" STATUS="required" VIEW-ANGLE="0" />
+			<Marker NAME="Go22" RADIUS="14" RGB="255 164 0" STATUS="optional" VIEW-ANGLE="0" />
+			<Marker NAME="Go23" RADIUS="14" RGB="255 164 0" STATUS="optional" VIEW-ANGLE="0" />
+			<Marker NAME="Go24" RADIUS="14" RGB="255 164 0" STATUS="optional" VIEW-ANGLE="0" />
+			<Marker NAME="Go25" RADIUS="14" RGB="255 164 0" STATUS="optional" VIEW-ANGLE="0" />
+			<Marker NAME="Go26" RADIUS="14" RGB="255 164 0" STATUS="optional" VIEW-ANGLE="0" />
+			<Marker NAME="Go27" RADIUS="14" RGB="255 164 0" STATUS="optional" VIEW-ANGLE="0" />
+			<Marker NAME="Go28" RADIUS="14" RGB="255 164 0" STATUS="optional" VIEW-ANGLE="0" />
+			<Marker NAME="Go29" RADIUS="14" RGB="255 164 0" STATUS="optional" VIEW-ANGLE="0" />
+			<Marker NAME="Go210" RADIUS="14" RGB="255 164 0" STATUS="optional" VIEW-ANGLE="0" />
+			<Marker NAME="Go211" RADIUS="14" RGB="255 164 0" STATUS="optional" VIEW-ANGLE="0" />
+		</Markers>
+		<Sticks>
+			<Stick MARKER1="Go21" MARKER2="Go22" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go21" MARKER2="Go23" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go21" MARKER2="Go24" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go21" MARKER2="Go25" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go21" MARKER2="Go26" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go21" MARKER2="Go27" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go21" MARKER2="Go28" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go21" MARKER2="Go29" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go21" MARKER2="Go210" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go21" MARKER2="Go211" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go22" MARKER2="Go23" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go22" MARKER2="Go24" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go22" MARKER2="Go25" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go22" MARKER2="Go26" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go22" MARKER2="Go27" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go22" MARKER2="Go28" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go22" MARKER2="Go29" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go22" MARKER2="Go210" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go22" MARKER2="Go211" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go23" MARKER2="Go24" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go23" MARKER2="Go25" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go23" MARKER2="Go26" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go23" MARKER2="Go27" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go23" MARKER2="Go28" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go23" MARKER2="Go29" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go23" MARKER2="Go210" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go23" MARKER2="Go211" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go24" MARKER2="Go25" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go24" MARKER2="Go26" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go24" MARKER2="Go27" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go24" MARKER2="Go28" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go24" MARKER2="Go29" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go24" MARKER2="Go210" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go24" MARKER2="Go211" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go25" MARKER2="Go26" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go25" MARKER2="Go27" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go25" MARKER2="Go28" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go25" MARKER2="Go29" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go25" MARKER2="Go210" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go25" MARKER2="Go211" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go26" MARKER2="Go27" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go26" MARKER2="Go28" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go26" MARKER2="Go29" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go26" MARKER2="Go210" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go26" MARKER2="Go211" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go27" MARKER2="Go28" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go27" MARKER2="Go29" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go27" MARKER2="Go210" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go27" MARKER2="Go211" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go28" MARKER2="Go29" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go28" MARKER2="Go210" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go28" MARKER2="Go211" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go29" MARKER2="Go210" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go29" MARKER2="Go211" RGB1="255 164 0" RGB2="255 164 0" />
+			<Stick MARKER1="Go210" MARKER2="Go211" RGB1="255 164 0" RGB2="255 164 0" />
+		</Sticks>
+	</MarkerSet>
+	<TargetSet>
+		<Targets>
+			<TargetLocalPointToWorldPoint COVARIANCE="1 0 0 0 1 0 0 0 1" FILL-GAPS="false" GAUSSIAN="true" HIDDEN="false" MARKER="Go21" OPACITY="255" POSITION="'Go2_Go21_x' 'Go2_Go21_y' 'Go2_Go21_z'" RGB="93 93 93" SEGMENT="Go2" WEIGHT="1" DRAW-STYLE="None">
+				<TargetLocalPointToWorldPointTemplate COVARIANCE="1 0 0 0 1 0 0 0 1" />
+			</TargetLocalPointToWorldPoint>
+			<TargetLocalPointToWorldPoint COVARIANCE="1 0 0 0 1 0 0 0 1" FILL-GAPS="false" GAUSSIAN="true" HIDDEN="false" MARKER="Go22" OPACITY="255" POSITION="'Go2_Go22_x' 'Go2_Go22_y' 'Go2_Go22_z'" RGB="93 93 93" SEGMENT="Go2" WEIGHT="1" DRAW-STYLE="None">
+				<TargetLocalPointToWorldPointTemplate COVARIANCE="1 0 0 0 1 0 0 0 1" />
+			</TargetLocalPointToWorldPoint>
+			<TargetLocalPointToWorldPoint COVARIANCE="1 0 0 0 1 0 0 0 1" FILL-GAPS="false" GAUSSIAN="true" HIDDEN="false" MARKER="Go23" OPACITY="255" POSITION="'Go2_Go23_x' 'Go2_Go23_y' 'Go2_Go23_z'" RGB="93 93 93" SEGMENT="Go2" WEIGHT="1" DRAW-STYLE="None">
+				<TargetLocalPointToWorldPointTemplate COVARIANCE="1 0 0 0 1 0 0 0 1" />
+			</TargetLocalPointToWorldPoint>
+			<TargetLocalPointToWorldPoint COVARIANCE="1 0 0 0 1 0 0 0 1" FILL-GAPS="false" GAUSSIAN="true" HIDDEN="false" MARKER="Go24" OPACITY="255" POSITION="'Go2_Go24_x' 'Go2_Go24_y' 'Go2_Go24_z'" RGB="93 93 93" SEGMENT="Go2" WEIGHT="1" DRAW-STYLE="None">
+				<TargetLocalPointToWorldPointTemplate COVARIANCE="1 0 0 0 1 0 0 0 1" />
+			</TargetLocalPointToWorldPoint>
+			<TargetLocalPointToWorldPoint COVARIANCE="1 0 0 0 1 0 0 0 1" FILL-GAPS="false" GAUSSIAN="true" HIDDEN="false" MARKER="Go25" OPACITY="255" POSITION="'Go2_Go25_x' 'Go2_Go25_y' 'Go2_Go25_z'" RGB="93 93 93" SEGMENT="Go2" WEIGHT="1" DRAW-STYLE="None">
+				<TargetLocalPointToWorldPointTemplate COVARIANCE="1 0 0 0 1 0 0 0 1" />
+			</TargetLocalPointToWorldPoint>
+			<TargetLocalPointToWorldPoint COVARIANCE="1 0 0 0 1 0 0 0 1" FILL-GAPS="false" GAUSSIAN="true" HIDDEN="false" MARKER="Go26" OPACITY="255" POSITION="'Go2_Go26_x' 'Go2_Go26_y' 'Go2_Go26_z'" RGB="93 93 93" SEGMENT="Go2" WEIGHT="1" DRAW-STYLE="None">
+				<TargetLocalPointToWorldPointTemplate COVARIANCE="1 0 0 0 1 0 0 0 1" />
+			</TargetLocalPointToWorldPoint>
+			<TargetLocalPointToWorldPoint COVARIANCE="1 0 0 0 1 0 0 0 1" FILL-GAPS="false" GAUSSIAN="true" HIDDEN="false" MARKER="Go27" OPACITY="255" POSITION="'Go2_Go27_x' 'Go2_Go27_y' 'Go2_Go27_z'" RGB="93 93 93" SEGMENT="Go2" WEIGHT="1" DRAW-STYLE="None">
+				<TargetLocalPointToWorldPointTemplate COVARIANCE="1 0 0 0 1 0 0 0 1" />
+			</TargetLocalPointToWorldPoint>
+			<TargetLocalPointToWorldPoint COVARIANCE="1 0 0 0 1 0 0 0 1" FILL-GAPS="false" GAUSSIAN="true" HIDDEN="false" MARKER="Go28" OPACITY="255" POSITION="'Go2_Go28_x' 'Go2_Go28_y' 'Go2_Go28_z'" RGB="93 93 93" SEGMENT="Go2" WEIGHT="1" DRAW-STYLE="None">
+				<TargetLocalPointToWorldPointTemplate COVARIANCE="1 0 0 0 1 0 0 0 1" />
+			</TargetLocalPointToWorldPoint>
+			<TargetLocalPointToWorldPoint COVARIANCE="1 0 0 0 1 0 0 0 1" FILL-GAPS="false" GAUSSIAN="true" HIDDEN="false" MARKER="Go29" OPACITY="255" POSITION="'Go2_Go29_x' 'Go2_Go29_y' 'Go2_Go29_z'" RGB="93 93 93" SEGMENT="Go2" WEIGHT="1" DRAW-STYLE="None">
+				<TargetLocalPointToWorldPointTemplate COVARIANCE="1 0 0 0 1 0 0 0 1" />
+			</TargetLocalPointToWorldPoint>
+			<TargetLocalPointToWorldPoint COVARIANCE="1 0 0 0 1 0 0 0 1" FILL-GAPS="false" GAUSSIAN="true" HIDDEN="false" MARKER="Go210" OPACITY="255" POSITION="'Go2_Go210_x' 'Go2_Go210_y' 'Go2_Go210_z'" RGB="93 93 93" SEGMENT="Go2" WEIGHT="1" DRAW-STYLE="None">
+				<TargetLocalPointToWorldPointTemplate COVARIANCE="1 0 0 0 1 0 0 0 1" />
+			</TargetLocalPointToWorldPoint>
+			<TargetLocalPointToWorldPoint COVARIANCE="1 0 0 0 1 0 0 0 1" FILL-GAPS="false" GAUSSIAN="true" HIDDEN="false" MARKER="Go211" OPACITY="255" POSITION="'Go2_Go211_x' 'Go2_Go211_y' 'Go2_Go211_z'" RGB="93 93 93" SEGMENT="Go2" WEIGHT="1" DRAW-STYLE="None">
+				<TargetLocalPointToWorldPointTemplate COVARIANCE="1 0 0 0 1 0 0 0 1" />
+			</TargetLocalPointToWorldPoint>
+		</Targets>
+	</TargetSet>
+</KinematicModel>
