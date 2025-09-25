@@ -241,7 +241,7 @@ class Inekf(Node):
 
         # Transform to base frame
         base_pose = oMimu.act(self.imuMbase)
-        base_velocity = self.imuMbase.act(v_imu_local)
+        base_velocity = self.imuMbase.actInv(v_imu_local)
 
         # Convert to quaternion
         base_quaternion = pin.Quaternion(base_pose.rotation)
