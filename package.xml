@@ -18,9 +18,9 @@
   <depend>builtin_interfaces</depend>
   <depend>inekf</depend>
   <depend>tf2</depend>
+  <depend>unitree_description</depend>
 
   <exec_depend>pinocchio</exec_depend>
-  <exec_depend>go2_description</exec_depend>
   <exec_depend>rosidl_default_runtime</exec_depend>
   <exec_depend>rclpy</exec_depend>
 

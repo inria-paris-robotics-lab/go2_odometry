@@ -17,7 +17,7 @@ find_package(nav_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(inekf REQUIRED)
 find_package(builtin_interfaces REQUIRED)
-find_package(go2_description REQUIRED)
+find_package(unitree_description REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 
 unset(PYTHON_SOABI)
