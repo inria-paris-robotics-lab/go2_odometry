@@ -121,7 +121,7 @@ Takes several ros parameters :
 
 
 
----
+ ---
 ### go2_state_publisher.launch.py
 This launchfile is usefull to use other standard ros node out of the box. For instance, for RVIZ to display a robot it needs 1. a robot description 2. The TF of all the bodies.
 
