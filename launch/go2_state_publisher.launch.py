@@ -1,10 +1,10 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from go2_description import GO2_DESCRIPTION_URDF_PATH
+from unitree_description import GO2_DESCRIPTION_URDF_PATH
 
 
 def generate_launch_description():
-    # Read go2 urdf from go2_description
+    # Read go2 urdf from unitree_description
     with open(GO2_DESCRIPTION_URDF_PATH, "r") as info:
         robot_desc = info.read()
 
