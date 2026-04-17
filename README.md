@@ -15,7 +15,7 @@ The main dependencies of this package are:
 * [ROS2](https://docs.ros.org/en/jazzy/Installation.html)
 * Unitree ros2 interface: https://github.com/unitreerobotics/unitree_ros2
 * Our fork of the invariant ekf lib: https://github.com/inria-paris-robotics-lab/invariant-ekf
-* Our fork of the go2 urdf files : https://github.com/inria-paris-robotics-lab/go2_description
+* Our fork of the unitree urdf files : https://github.com/inria-paris-robotics-lab/unitree_description
 * Pinocchio (conda or apt installable, but might already come with your ros install)
 
 

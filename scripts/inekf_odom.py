@@ -14,7 +14,7 @@ from tf2_ros import TransformBroadcaster
 from geometry_msgs.msg import TransformStamped
 from rcl_interfaces.msg import ParameterDescriptor as PD
 from inekf import RobotState, NoiseParams, InEKF, Kinematics
-from go2_description.loader import loadGo2
+from unitree_description.loader import loadGo2
 
 
 # ==============================================================================
